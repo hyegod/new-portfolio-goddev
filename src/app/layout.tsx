@@ -37,9 +37,40 @@ const permanentMarker = Permanent_Marker({
 });
 
 export const metadata: Metadata = {
-  title: "Kairo Pratama, S.T. — Civil Engineer & Software Engineer",
+  title: {
+    default: "Kairo Pratama, S.T. — Civil Engineer & Software Engineer",
+    template: "%s",
+  },
   description:
     "Personal portfolio of Kairo Pratama — Civil Engineer & Software Engineer uniting structural infrastructure, BIM automation, full-stack systems, and 3D WebGL LiDAR point clouds.",
+  keywords: [
+    "Civil Engineer",
+    "Software Engineer",
+    "Structural Engineering",
+    "BIM Automation",
+    "Three.js",
+    "WebGL",
+    "LiDAR Point Cloud",
+    "Next.js Portfolio",
+  ],
+  authors: [{ name: "Kairo Pratama, S.T." }],
+  openGraph: {
+    type: "website",
+    title: "Kairo Pratama, S.T. — Civil Engineer & Software Engineer",
+    description:
+      "Bridging structural engineering, BIM automation, full-stack software, and interactive 3D WebGL LiDAR point clouds.",
+    siteName: "KAIRO // CIVIL × SWE",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Kairo Pratama, S.T. — Civil Engineer & Software Engineer",
+    description:
+      "Structural infrastructure, BIM automation, full-stack systems, and interactive 3D WebGL LiDAR point clouds.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export const viewport: Viewport = {

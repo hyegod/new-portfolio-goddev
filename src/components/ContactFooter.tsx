@@ -224,12 +224,12 @@ export function ContactFooter() {
               <p className="font-mono text-[9.5px] tracking-[0.18em] text-[#0038FF] uppercase sm:text-[10px] sm:tracking-[0.22em]">
                 COLOPHON // ARCHITECTURE
               </p>
-              <h1
+              <h2
                 id="credits-dialog-title"
                 className="mt-1 break-words font-display text-lg font-extrabold uppercase sm:text-2xl"
               >
                 CREDITS &amp; MODERN WEB STACK
-              </h1>
+              </h2>
             </div>
             <form method="dialog" className="shrink-0">
               <button
