@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     title: "Godlift Farrelio — Civil Engineering × Software Development",
     description:
       "Civil Engineering student at Bosowa University & Full-Stack Software Developer from Indonesia — uniting structures, code, music, and visual storytelling.",
-    siteName: "GODLIFT // CIVIL × SWE",
+    siteName: "GODDEV // CIVIL × SWE",
   },
   twitter: {
     card: "summary_large_image",

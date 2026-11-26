@@ -68,8 +68,7 @@ export interface GatherSwatch {
 }
 
 export const PORTFOLIO_PROFILE = {
-  brand: "GODLIFT",
-  monogram: "G",
+  brand: "GODDEV",
   fullName: "Godlift Farrelio",
   githubUsername: "hyegod",
   jpMark: "構造・開発",

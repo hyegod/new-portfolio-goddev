@@ -101,14 +101,7 @@ export function Navbar() {
             href={isHome ? "#home" : "/"}
             className="group inline-flex min-w-0 items-center gap-2 justify-self-start whitespace-nowrap min-[380px]:gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0038FF]"
           >
-            <motion.span
-              whileHover={{ rotate: -8, scale: 1.08 }}
-              transition={{ type: "spring", stiffness: 420, damping: 24 }}
-              className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#0D0E12] font-mono text-[10px] font-bold text-white transition-colors group-hover:bg-[#0038FF]"
-            >
-              {PORTFOLIO_PROFILE.monogram}
-            </motion.span>
-            <span className="text-trim font-display text-xs font-extrabold tracking-[0.14em] text-[#0D0E12] uppercase min-[380px]:text-sm min-[380px]:tracking-[0.22em]">
+            <span className="text-trim font-display text-xs font-extrabold tracking-[0.14em] text-[#0D0E12] uppercase transition-colors group-hover:text-[#0038FF] min-[380px]:text-sm min-[380px]:tracking-[0.22em]">
               {PORTFOLIO_PROFILE.brand}
             </span>
             <span className="hidden font-mono text-[10px] tracking-[0.14em] text-[#505562] md:inline lg:hidden xl:inline">
