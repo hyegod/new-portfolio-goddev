@@ -63,6 +63,31 @@ export interface GalleryPlate {
   imageUrl?: string | null;
 }
 
+export type PhotoBentoSize = "hero" | "wide" | "tall" | "square";
+
+export type PhotoCategory =
+  | "STREET"
+  | "ARCHITECTURE"
+  | "LANDSCAPE"
+  | "STAGE"
+  | "MONOCHROME";
+
+export type PhotoTone = "cobalt" | "obsidian" | "concrete" | "amber" | "slate";
+
+export interface PhotoGalleryItem {
+  id: string;
+  frame: string;
+  title: string;
+  description: string;
+  takenDate: string;
+  location: string;
+  category: PhotoCategory;
+  camera?: string;
+  bentoSize: PhotoBentoSize;
+  tone?: PhotoTone;
+  imageUrl?: string | null;
+}
+
 export interface GatherSwatch {
   id: string;
   name: string;
@@ -283,7 +308,7 @@ export const PROJECTS: ProjectItem[] = [
       { label: "TELEMETRY NODES", value: "120+ LIVE" },
     ],
     stack: ["Next.js", "Three.js", "GLSL", "Python", "ETABS API"],
-    liveUrl: "/gallery?preset=bridge",
+    liveUrl: "/works?preset=bridge#lab",
   },
   {
     id: "terragrid",
@@ -336,7 +361,7 @@ export const PROJECTS: ProjectItem[] = [
       { label: "EARTHWORK DELTA", value: "±0.8% ACC" },
     ],
     stack: ["TypeScript", "WebGL2", "Civil 3D", "PostGIS", "Tailwind v4"],
-    liveUrl: "/gallery?preset=terrain",
+    liveUrl: "/works?preset=terrain#lab",
   },
   {
     id: "towercore",
@@ -389,7 +414,7 @@ export const PROJECTS: ProjectItem[] = [
       { label: "CODE CHECKS", value: "SNI / ACI" },
     ],
     stack: ["Revit API", "Python", "React 19", "Three.js", "ETABS"],
-    liveUrl: "/gallery?preset=tower",
+    liveUrl: "/works?preset=tower#lab",
   },
   {
     id: "archshell",
@@ -442,7 +467,7 @@ export const PROJECTS: ProjectItem[] = [
       { label: "INTERACTION", value: "14 MS INP" },
     ],
     stack: ["TypeScript", "GLSL Shaders", "Next.js", "Grasshopper", "AutoCAD"],
-    liveUrl: "/gallery?preset=shell",
+    liveUrl: "/works?preset=shell#lab",
   },
 ];
 
@@ -545,6 +570,88 @@ export const GALLERY_PLATES: GalleryPlate[] = [
     visualType: "bim-pipeline",
     caption:
       "End-to-end engineering software architecture bridging Revit/ETABS extraction scripts with browser GPU point-cloud rendering.",
+  },
+];
+
+// Curated photography hobby frames (6 tiles pack cleanly into a 4x3 desktop Bento Grid with zero gaps)
+export const PHOTO_GALLERY: PhotoGalleryItem[] = [
+  {
+    id: "photo-01",
+    frame: "01",
+    title: "BLUE HOUR ALONG LOSARI PIER",
+    description:
+      "Long-exposure coastal frame right after dusk when the harbor lights settle into calm cobalt reflections along the concrete breakwater.",
+    takenDate: "2026-11-12",
+    location: "Pantai Losari, Makassar",
+    category: "LANDSCAPE",
+    camera: "35mm · f/2.0 · 1/15s",
+    bentoSize: "hero",
+    tone: "cobalt",
+  },
+  {
+    id: "photo-02",
+    frame: "02",
+    title: "EXPOSED CONCRETE & MORNING SHADOWS",
+    description:
+      "Sharp architectural geometry across raw brutalist colonnades during early campus light — studying how structural rhythm shapes shadow.",
+    takenDate: "2026-10-28",
+    location: "Bosowa University, Makassar",
+    category: "ARCHITECTURE",
+    camera: "50mm · f/4.0 · 1/400s",
+    bentoSize: "wide",
+    tone: "concrete",
+  },
+  {
+    id: "photo-03",
+    frame: "03",
+    title: "AFTER-RAIN ASPHALT REFLECTIONS",
+    description:
+      "Late-night street walk catching neon reflections and blurred headlights across wet pavement after a sudden tropical downpour.",
+    takenDate: "2026-10-14",
+    location: "Jl. Pettarani, Makassar",
+    category: "STREET",
+    camera: "28mm · f/1.8 · 1/60s",
+    bentoSize: "square",
+    tone: "obsidian",
+  },
+  {
+    id: "photo-04",
+    frame: "04",
+    title: "LOW-END STAGE LIGHTS · BASS CHECK",
+    description:
+      "Vertical frame from soundcheck before an evening gig — tungsten rim light cutting through stage haze across the bass headstock.",
+    takenDate: "2026-09-22",
+    location: "Makassar Music Space",
+    category: "STAGE",
+    camera: "85mm · f/1.8 · 1/125s",
+    bentoSize: "tall",
+    tone: "amber",
+  },
+  {
+    id: "photo-05",
+    frame: "05",
+    title: "MONOCHROME STEEL TRUSS STUDY",
+    description:
+      "High-contrast black-and-white study looking straight up through riveted steel diagonals and overhead tension members.",
+    takenDate: "2026-08-30",
+    location: "Makassar New Port Corridor",
+    category: "MONOCHROME",
+    camera: "35mm · f/5.6 · 1/640s",
+    bentoSize: "square",
+    tone: "slate",
+  },
+  {
+    id: "photo-06",
+    frame: "06",
+    title: "GOLDEN HORIZON OVER CPI BRIDGE",
+    description:
+      "Wide golden-hour perspective capturing cable silhouettes and harbor breeze sweeping across the waterfront promenade.",
+    takenDate: "2026-08-09",
+    location: "Center Point of Indonesia, Makassar",
+    category: "LANDSCAPE",
+    camera: "24mm · f/2.8 · 1/250s",
+    bentoSize: "wide",
+    tone: "cobalt",
   },
 ];
 

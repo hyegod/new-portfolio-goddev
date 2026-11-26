@@ -78,10 +78,14 @@ export function WorkCaseStudyClient({
 
             <div className="reveal-up flex shrink-0 flex-wrap items-center gap-2.5">
               <Link
-                href={project.liveUrl}
+                href={
+                  project.liveUrl.startsWith("/gallery?preset=")
+                    ? `${project.liveUrl.replace("/gallery?preset=", "/works?preset=")}#lab`
+                    : project.liveUrl
+                }
                 className="group inline-flex items-center gap-2 rounded-lg bg-[#0038FF] px-4 py-2.5 whitespace-nowrap font-mono text-[10.5px] font-semibold tracking-[0.16em] text-white uppercase transition-colors hover:bg-[#0D0E12] sm:text-[11px]"
               >
-                <span className="text-trim">OPEN IN 3D GALLERY</span>
+                <span className="text-trim">OPEN IN 3D LAB</span>
                 <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Link>
               <a

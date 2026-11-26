@@ -1,8 +1,13 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import {
   GALLERY_PLATES,
+  PHOTO_GALLERY,
   PROJECTS,
   type GalleryPlate,
+  type PhotoBentoSize,
+  type PhotoCategory,
+  type PhotoGalleryItem,
+  type PhotoTone,
   type PointPresetId,
   type ProjectArchitectureBlock,
   type ProjectItem,
@@ -161,6 +166,25 @@ export async function ensurePortfolioTables(): Promise<boolean> {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS portfolio_photos (
+      id TEXT PRIMARY KEY,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      frame_label TEXT NOT NULL DEFAULT '01',
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      taken_date TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'STREET',
+      camera TEXT NOT NULL DEFAULT '',
+      bento_size TEXT NOT NULL DEFAULT 'square',
+      tone TEXT NOT NULL DEFAULT 'obsidian',
+      image_url TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
   tablesReady = true;
   return true;
 }
@@ -199,6 +223,21 @@ const VALID_VISUAL_TYPES: GalleryPlate["visualType"][] = [
   "rebar-detail",
   "bim-pipeline",
 ];
+const VALID_PHOTO_CATEGORIES: PhotoCategory[] = [
+  "STREET",
+  "ARCHITECTURE",
+  "LANDSCAPE",
+  "STAGE",
+  "MONOCHROME",
+];
+const VALID_BENTO_SIZES: PhotoBentoSize[] = ["hero", "wide", "tall", "square"];
+const VALID_PHOTO_TONES: PhotoTone[] = [
+  "cobalt",
+  "obsidian",
+  "concrete",
+  "amber",
+  "slate",
+];
 
 function mapProjectRow(row: Record<string, unknown>): ProjectItem {
   const presetRaw = String(row.preset ?? "bridge") as PointPresetId;
@@ -229,8 +268,35 @@ function mapProjectRow(row: Record<string, unknown>): ProjectItem {
     ),
     metrics: parseJsonArray<{ label: string; value: string }>(row.metrics, []),
     stack: parseJsonArray<string>(row.stack, []),
-    liveUrl: String(row.live_url ?? `/gallery?preset=${preset}`),
+    liveUrl: String(row.live_url ?? `/works?preset=${preset}#lab`),
     imageUrl: typeof row.image_url === "string" && row.image_url.trim() ? row.image_url : null,
+  };
+}
+
+function mapPhotoRow(row: Record<string, unknown>): PhotoGalleryItem {
+  const catRaw = String(row.category ?? "STREET").toUpperCase() as PhotoCategory;
+  const category = VALID_PHOTO_CATEGORIES.includes(catRaw) ? catRaw : "STREET";
+  const sizeRaw = String(row.bento_size ?? "square").toLowerCase() as PhotoBentoSize;
+  const bentoSize = VALID_BENTO_SIZES.includes(sizeRaw) ? sizeRaw : "square";
+  const toneRaw = String(row.tone ?? "obsidian").toLowerCase() as PhotoTone;
+  const tone = VALID_PHOTO_TONES.includes(toneRaw) ? toneRaw : "obsidian";
+  const cameraStr = typeof row.camera === "string" ? row.camera.trim() : "";
+
+  return {
+    id: String(row.id),
+    frame: String(row.frame_label ?? "01"),
+    title: String(row.title ?? ""),
+    description: String(row.description ?? ""),
+    takenDate: String(row.taken_date ?? ""),
+    location: String(row.location ?? ""),
+    category,
+    camera: cameraStr || undefined,
+    bentoSize,
+    tone,
+    imageUrl:
+      typeof row.image_url === "string" && row.image_url.trim()
+        ? row.image_url
+        : null,
   };
 }
 
@@ -325,9 +391,98 @@ export async function getPortfolioGalleryPlatesStrict(): Promise<GalleryPlate[]>
   return rows.map((row) => mapGalleryRow(row as Record<string, unknown>));
 }
 
+export async function getPortfolioPhotos(): Promise<PhotoGalleryItem[]> {
+  const sql = getSql();
+  if (!sql) return PHOTO_GALLERY;
+
+  try {
+    await ensurePortfolioTables();
+    const rows = await sql`
+      SELECT * FROM portfolio_photos
+      ORDER BY sort_order ASC, created_at DESC
+    `;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return PHOTO_GALLERY;
+    }
+    return rows.map((row) => mapPhotoRow(row as Record<string, unknown>));
+  } catch {
+    return PHOTO_GALLERY;
+  }
+}
+
+export async function getPortfolioPhotosStrict(): Promise<PhotoGalleryItem[]> {
+  const sql = getSql();
+  if (!sql) return [];
+  await ensurePortfolioTables();
+  const rows = await sql`
+    SELECT * FROM portfolio_photos
+    ORDER BY sort_order ASC, created_at DESC
+  `;
+  return rows.map((row) => mapPhotoRow(row as Record<string, unknown>));
+}
+
+export async function upsertPortfolioPhoto(
+  item: PhotoGalleryItem,
+  sortOrder?: number
+): Promise<PhotoGalleryItem> {
+  const sql = getSql();
+  if (!sql) throw new Error("DATABASE_URL is not configured");
+  await ensurePortfolioTables();
+
+  const orderVal =
+    typeof sortOrder === "number" && Number.isFinite(sortOrder)
+      ? sortOrder
+      : Number.parseInt(item.frame, 10) || 10;
+
+  const rows = await sql`
+    INSERT INTO portfolio_photos (
+      id, sort_order, frame_label, title, description, taken_date, location,
+      category, camera, bento_size, tone, image_url, updated_at
+    )
+    VALUES (
+      ${item.id}, ${orderVal}, ${item.frame}, ${item.title}, ${item.description},
+      ${item.takenDate}, ${item.location}, ${item.category}, ${item.camera ?? ""},
+      ${item.bentoSize}, ${item.tone ?? "obsidian"}, ${item.imageUrl ?? null}, NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      sort_order = EXCLUDED.sort_order,
+      frame_label = EXCLUDED.frame_label,
+      title = EXCLUDED.title,
+      description = EXCLUDED.description,
+      taken_date = EXCLUDED.taken_date,
+      location = EXCLUDED.location,
+      category = EXCLUDED.category,
+      camera = EXCLUDED.camera,
+      bento_size = EXCLUDED.bento_size,
+      tone = EXCLUDED.tone,
+      image_url = EXCLUDED.image_url,
+      updated_at = NOW()
+    RETURNING *
+  `;
+
+  return mapPhotoRow(rows[0] as Record<string, unknown>);
+}
+
+export async function deletePortfolioPhoto(
+  id: string
+): Promise<{ deletedImageUrl: string | null }> {
+  const sql = getSql();
+  if (!sql) throw new Error("DATABASE_URL is not configured");
+  await ensurePortfolioTables();
+
+  const rows = await sql`
+    DELETE FROM portfolio_photos
+    WHERE id = ${id}
+    RETURNING image_url
+  `;
+  const url = rows[0]?.image_url;
+  return { deletedImageUrl: typeof url === "string" ? url : null };
+}
+
 export async function seedDefaultPortfolioData(): Promise<{
   projectsInserted: number;
   platesInserted: number;
+  photosInserted: number;
 }> {
   const sql = getSql();
   if (!sql) {
@@ -379,7 +534,26 @@ export async function seedDefaultPortfolioData(): Promise<{
     if (res.length > 0) platesInserted++;
   }
 
-  return { projectsInserted, platesInserted };
+  let photosInserted = 0;
+  for (let i = 0; i < PHOTO_GALLERY.length; i++) {
+    const ph = PHOTO_GALLERY[i];
+    const res = await sql`
+      INSERT INTO portfolio_photos (
+        id, sort_order, frame_label, title, description, taken_date, location,
+        category, camera, bento_size, tone, image_url
+      )
+      VALUES (
+        ${ph.id}, ${i + 1}, ${ph.frame}, ${ph.title}, ${ph.description},
+        ${ph.takenDate}, ${ph.location}, ${ph.category}, ${ph.camera ?? ""},
+        ${ph.bentoSize}, ${ph.tone ?? "obsidian"}, ${ph.imageUrl ?? null}
+      )
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id
+    `;
+    if (res.length > 0) photosInserted++;
+  }
+
+  return { projectsInserted, platesInserted, photosInserted };
 }
 
 export async function upsertPortfolioProject(
@@ -519,19 +693,22 @@ export async function getStorageStatus() {
   let dbConnected = false;
   let projectCount = 0;
   let plateCount = 0;
+  let photoCount = 0;
 
   if (dbConfigured) {
     try {
       const sql = getSql();
       if (sql) {
         await ensurePortfolioTables();
-        const [pRows, gRows] = await Promise.all([
+        const [pRows, gRows, phRows] = await Promise.all([
           sql`SELECT COUNT(*)::int AS count FROM portfolio_projects`,
           sql`SELECT COUNT(*)::int AS count FROM portfolio_gallery_plates`,
+          sql`SELECT COUNT(*)::int AS count FROM portfolio_photos`,
         ]);
         dbConnected = true;
         projectCount = Number(pRows[0]?.count ?? 0);
         plateCount = Number(gRows[0]?.count ?? 0);
+        photoCount = Number(phRows[0]?.count ?? 0);
       }
     } catch {
       dbConnected = false;
@@ -544,5 +721,6 @@ export async function getStorageStatus() {
     blobConfigured,
     projectCount,
     plateCount,
+    photoCount,
   };
 }

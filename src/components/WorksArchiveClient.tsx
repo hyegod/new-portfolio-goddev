@@ -4,8 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
-import { PROJECTS, type ProjectItem } from "@/data/portfolio";
+import {
+  GALLERY_PLATES,
+  PROJECTS,
+  type GalleryPlate,
+  type ProjectItem,
+} from "@/data/portfolio";
 import { GitHubWorksPanel } from "./GitHubWorksPanel";
+import { WorksLabSection } from "./WorksLabSection";
 
 type DisciplineFilter = "ALL" | ProjectItem["discipline"];
 
@@ -19,8 +25,10 @@ const DISCIPLINE_FILTERS: DisciplineFilter[] = [
 
 export function WorksArchiveClient({
   projects = PROJECTS,
+  plates = GALLERY_PLATES,
 }: {
   projects?: ProjectItem[];
+  plates?: GalleryPlate[];
 }) {
   const list = projects.length > 0 ? projects : PROJECTS;
   const [activeFilter, setActiveFilter] = useState<DisciplineFilter>("ALL");
@@ -196,6 +204,9 @@ export function WorksArchiveClient({
 
         {/* Live GitHub Contributions & Auto-Synced Public Repos */}
         <GitHubWorksPanel />
+
+        {/* Interactive 3D LiDAR Studio, WebGPU Lab (vgpu), & Technical Blueprint Plates */}
+        <WorksLabSection showPlates plates={plates} />
       </div>
     </section>
   );

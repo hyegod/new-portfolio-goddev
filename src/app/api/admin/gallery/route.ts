@@ -1,14 +1,19 @@
 import { del } from "@vercel/blob";
 import { NextResponse } from "next/server";
-import type { GalleryPlate } from "@/data/portfolio";
+import type {
+  PhotoBentoSize,
+  PhotoCategory,
+  PhotoGalleryItem,
+  PhotoTone,
+} from "@/data/portfolio";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import {
-  deletePortfolioGalleryPlate,
+  deletePortfolioPhoto,
   extractBlobTargetForDelete,
   getBlobAuthOptions,
-  getPortfolioGalleryPlatesStrict,
+  getPortfolioPhotosStrict,
   isDatabaseConfigured,
-  upsertPortfolioGalleryPlate,
+  upsertPortfolioPhoto,
 } from "@/lib/db";
 import { revalidatePortfolioPages } from "@/lib/revalidate";
 
@@ -21,17 +26,33 @@ function slugify(value: string): string {
     .slice(0, 64);
 }
 
+const VALID_CATEGORIES = new Set<PhotoCategory>([
+  "STREET",
+  "ARCHITECTURE",
+  "LANDSCAPE",
+  "STAGE",
+  "MONOCHROME",
+]);
+const VALID_SIZES = new Set<PhotoBentoSize>(["hero", "wide", "tall", "square"]);
+const VALID_TONES = new Set<PhotoTone>([
+  "cobalt",
+  "obsidian",
+  "concrete",
+  "amber",
+  "slate",
+]);
+
 export async function GET() {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!isDatabaseConfigured()) {
-    return NextResponse.json({ plates: [], dbConfigured: false });
+    return NextResponse.json({ photos: [], dbConfigured: false });
   }
 
   try {
-    const plates = await getPortfolioGalleryPlatesStrict();
-    return NextResponse.json({ plates, dbConfigured: true });
+    const photos = await getPortfolioPhotosStrict();
+    return NextResponse.json({ photos, dbConfigured: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Database query failed";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -50,69 +71,57 @@ export async function POST(request: Request) {
   }
 
   try {
-    const raw = (await request.json()) as Partial<GalleryPlate> & {
+    const raw = (await request.json()) as Partial<PhotoGalleryItem> & {
       sortOrder?: number;
     };
 
     const title = String(raw.title ?? "").trim();
     if (!title) {
-      return NextResponse.json({ error: "Gallery title is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Photo title is required." },
+        { status: 400 }
+      );
     }
 
-    const id = slugify(String(raw.id || `plate-${title}`));
+    const id = slugify(String(raw.id || `photo-${title}`));
     if (!id) {
-      return NextResponse.json({ error: "Invalid gallery id." }, { status: 400 });
+      return NextResponse.json({ error: "Invalid photo id." }, { status: 400 });
     }
 
-    const preset =
-      raw.preset === "bridge" ||
-      raw.preset === "tower" ||
-      raw.preset === "terrain" ||
-      raw.preset === "shell"
-        ? raw.preset
-        : "bridge";
+    const catRaw = String(raw.category ?? "STREET").toUpperCase() as PhotoCategory;
+    const category = VALID_CATEGORIES.has(catRaw) ? catRaw : "STREET";
 
-    const filterGroup =
-      raw.filterGroup === "STRUCTURAL" ||
-      raw.filterGroup === "GEOSPATIAL" ||
-      raw.filterGroup === "COMPUTATIONAL" ||
-      raw.filterGroup === "SOFTWARE"
-        ? raw.filterGroup
-        : "STRUCTURAL";
+    const sizeRaw = String(raw.bentoSize ?? "square").toLowerCase() as PhotoBentoSize;
+    const bentoSize = VALID_SIZES.has(sizeRaw) ? sizeRaw : "square";
 
-    const visualType =
-      raw.visualType === "bridge-elevation" ||
-      raw.visualType === "tower-section" ||
-      raw.visualType === "lidar-contour" ||
-      raw.visualType === "shell-grid" ||
-      raw.visualType === "rebar-detail" ||
-      raw.visualType === "bim-pipeline"
-        ? raw.visualType
-        : "bridge-elevation";
+    const toneRaw = String(raw.tone ?? "obsidian").toLowerCase() as PhotoTone;
+    const tone = VALID_TONES.has(toneRaw) ? toneRaw : "obsidian";
 
-    const plate: GalleryPlate = {
+    const photo: PhotoGalleryItem = {
       id,
-      code: String(raw.code ?? "FIG. NEW").trim().toUpperCase(),
+      frame: String(raw.frame ?? "01").trim().toUpperCase() || "01",
       title: title.toUpperCase(),
-      category: String(raw.category ?? filterGroup).trim().toUpperCase(),
-      filterGroup,
-      scale: String(raw.scale ?? "PHOTO / PLATE").trim().toUpperCase(),
-      coords: String(raw.coords ?? "-5.1477° S, 119.4327° E").trim().toUpperCase(),
-      year: String(raw.year ?? new Date().getFullYear()).trim(),
-      preset,
-      visualType,
-      caption: String(raw.caption ?? "").trim(),
+      description: String(raw.description ?? "").trim(),
+      takenDate:
+        String(raw.takenDate ?? "").trim() ||
+        new Date().toISOString().slice(0, 10),
+      location: String(raw.location ?? "").trim() || "Makassar, Indonesia",
+      category,
+      camera: String(raw.camera ?? "").trim() || undefined,
+      bentoSize,
+      tone,
       imageUrl:
         typeof raw.imageUrl === "string" && raw.imageUrl.trim()
           ? raw.imageUrl.trim()
           : null,
     };
 
-    const saved = await upsertPortfolioGalleryPlate(plate, raw.sortOrder);
+    const saved = await upsertPortfolioPhoto(photo, raw.sortOrder);
     revalidatePortfolioPages();
-    return NextResponse.json({ plate: saved });
+    return NextResponse.json({ photo: saved });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to save gallery item";
+    const message =
+      err instanceof Error ? err.message : "Failed to save photo";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -131,11 +140,11 @@ export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id")?.trim();
   if (!id) {
-    return NextResponse.json({ error: "Missing gallery plate id" }, { status: 400 });
+    return NextResponse.json({ error: "Missing photo id" }, { status: 400 });
   }
 
   try {
-    const { deletedImageUrl } = await deletePortfolioGalleryPlate(id);
+    const { deletedImageUrl } = await deletePortfolioPhoto(id);
     const blobAuth = getBlobAuthOptions();
     const blobTarget = deletedImageUrl
       ? extractBlobTargetForDelete(deletedImageUrl)
@@ -149,7 +158,8 @@ export async function DELETE(request: Request) {
     revalidatePortfolioPages();
     return NextResponse.json({ ok: true, id });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to delete gallery item";
+    const message =
+      err instanceof Error ? err.message : "Failed to delete photo";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

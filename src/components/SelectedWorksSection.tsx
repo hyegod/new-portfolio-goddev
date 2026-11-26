@@ -12,6 +12,7 @@ import {
 } from "@/lib/pointCloudGenerator";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
 import { GitHubWorksPanel } from "./GitHubWorksPanel";
+import { WorksLabSection } from "./WorksLabSection";
 
 export function SelectedWorksSection({
   projects = PROJECTS,
@@ -327,6 +328,9 @@ export function SelectedWorksSection({
 
         {/* Live GitHub Contribution Heatmap & Auto-Synced Public Repositories */}
         <GitHubWorksPanel />
+
+        {/* Interactive 3D LiDAR & WebGPU (vgpu) Engineering Lab */}
+        <WorksLabSection showPlates={false} />
       </div>
     </section>
   );

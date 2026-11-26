@@ -5,7 +5,7 @@ import { PortfolioExperience } from "@/components/PortfolioExperience";
 import { PORTFOLIO_PROFILE } from "@/data/portfolio";
 import { isAdminAuthenticated, isAdminPasswordConfigured } from "@/lib/adminAuth";
 import {
-  getPortfolioGalleryPlatesStrict,
+  getPortfolioPhotosStrict,
   getPortfolioProjectsStrict,
   getStorageStatus,
 } from "@/lib/db";
@@ -25,11 +25,11 @@ export default async function AdminPage() {
     getStorageStatus(),
   ]);
 
-  const [initialProjects, initialPlates] =
+  const [initialProjects, initialPhotos] =
     authenticated && storage.dbConnected
       ? await Promise.all([
           getPortfolioProjectsStrict().catch(() => []),
-          getPortfolioGalleryPlatesStrict().catch(() => []),
+          getPortfolioPhotosStrict().catch(() => []),
         ])
       : [[], []];
 
@@ -42,7 +42,7 @@ export default async function AdminPage() {
           adminConfigured={adminConfigured}
           initialStorage={storage}
           initialProjects={initialProjects}
-          initialPlates={initialPlates}
+          initialPhotos={initialPhotos}
         />
       </main>
     </PortfolioExperience>

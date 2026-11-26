@@ -8,16 +8,16 @@ import { SelectedWorksSection } from "@/components/SelectedWorksSection";
 import { SkillSection } from "@/components/SkillSection";
 import { SloganSection } from "@/components/SloganSection";
 import {
-  getPortfolioGalleryPlates,
+  getPortfolioPhotos,
   getPortfolioProjects,
 } from "@/lib/db";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [projects, plates] = await Promise.all([
+  const [projects, photos] = await Promise.all([
     getPortfolioProjects(),
-    getPortfolioGalleryPlates(),
+    getPortfolioPhotos(),
   ]);
 
   return (
@@ -29,7 +29,7 @@ export default async function HomePage() {
         <SloganSection />
         <SkillSection />
         <SelectedWorksSection projects={projects.slice(0, 4)} />
-        <GallerySection plates={plates.slice(0, 6)} />
+        <GallerySection photos={photos.slice(0, 6)} />
         <ContactFooter />
       </main>
     </PortfolioExperience>

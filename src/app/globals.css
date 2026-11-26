@@ -354,6 +354,10 @@ dialog.editorial-dialog {
   transition-behavior: allow-discrete;
 }
 
+dialog.editorial-dialog.editorial-dialog-wide {
+  max-width: min(calc(100vw - 24px), 1080px);
+}
+
 dialog.editorial-dialog[open] {
   display: flex;
   flex-direction: column;

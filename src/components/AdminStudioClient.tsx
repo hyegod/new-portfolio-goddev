@@ -17,7 +17,10 @@ import {
   X,
 } from "lucide-react";
 import type {
-  GalleryPlate,
+  PhotoBentoSize,
+  PhotoCategory,
+  PhotoGalleryItem,
+  PhotoTone,
   PointPresetId,
   ProjectItem,
 } from "@/data/portfolio";
@@ -28,6 +31,7 @@ interface StorageStatus {
   blobConfigured: boolean;
   projectCount: number;
   plateCount: number;
+  photoCount: number;
 }
 
 interface AdminStudioClientProps {
@@ -35,7 +39,7 @@ interface AdminStudioClientProps {
   adminConfigured: boolean;
   initialStorage: StorageStatus;
   initialProjects: ProjectItem[];
-  initialPlates: GalleryPlate[];
+  initialPhotos: PhotoGalleryItem[];
 }
 
 type ActiveTab = "works" | "gallery";
@@ -62,18 +66,17 @@ interface ProjectFormState {
   imageUrl: string;
 }
 
-interface GalleryFormState {
+interface PhotoFormState {
   id: string;
-  code: string;
+  frame: string;
   title: string;
-  category: string;
-  filterGroup: GalleryPlate["filterGroup"];
-  scale: string;
-  coords: string;
-  year: string;
-  preset: PointPresetId;
-  visualType: GalleryPlate["visualType"];
-  caption: string;
+  description: string;
+  takenDate: string;
+  location: string;
+  category: PhotoCategory;
+  camera: string;
+  bentoSize: PhotoBentoSize;
+  tone: PhotoTone;
   imageUrl: string;
 }
 
@@ -125,37 +128,35 @@ function projectToForm(p: ProjectItem): ProjectFormState {
   };
 }
 
-function emptyGalleryForm(nextIndex: number): GalleryFormState {
+function emptyPhotoForm(nextIndex: number): PhotoFormState {
   return {
     id: "",
-    code: `FIG. ${String(nextIndex).padStart(2, "0")} // ARCHIVE`,
+    frame: String(nextIndex).padStart(2, "0"),
     title: "",
-    category: "STRUCTURAL / PHOTO",
-    filterGroup: "STRUCTURAL",
-    scale: "PHOTO / PLATE",
-    coords: "-5.1477° S, 119.4327° E",
-    year: String(new Date().getFullYear()),
-    preset: "bridge",
-    visualType: "bridge-elevation",
-    caption: "",
+    description: "",
+    takenDate: new Date().toISOString().slice(0, 10),
+    location: "Makassar, Indonesia",
+    category: "STREET",
+    camera: "",
+    bentoSize: nextIndex === 1 ? "hero" : "square",
+    tone: "obsidian",
     imageUrl: "",
   };
 }
 
-function plateToForm(g: GalleryPlate): GalleryFormState {
+function photoToForm(item: PhotoGalleryItem): PhotoFormState {
   return {
-    id: g.id,
-    code: g.code,
-    title: g.title,
-    category: g.category,
-    filterGroup: g.filterGroup,
-    scale: g.scale,
-    coords: g.coords,
-    year: g.year,
-    preset: g.preset,
-    visualType: g.visualType,
-    caption: g.caption,
-    imageUrl: g.imageUrl ?? "",
+    id: item.id,
+    frame: item.frame,
+    title: item.title,
+    description: item.description,
+    takenDate: item.takenDate,
+    location: item.location,
+    category: item.category,
+    camera: item.camera ?? "",
+    bentoSize: item.bentoSize,
+    tone: item.tone ?? "obsidian",
+    imageUrl: item.imageUrl ?? "",
   };
 }
 
@@ -164,7 +165,7 @@ export function AdminStudioClient({
   adminConfigured,
   initialStorage,
   initialProjects,
-  initialPlates,
+  initialPhotos,
 }: AdminStudioClientProps) {
   const [authenticated, setAuthenticated] = useState(initialAuthenticated);
   const [storage, setStorage] = useState<StorageStatus>(initialStorage);
@@ -173,13 +174,13 @@ export function AdminStudioClient({
 
   const [tab, setTab] = useState<ActiveTab>("works");
   const [projects, setProjects] = useState<ProjectItem[]>(initialProjects);
-  const [plates, setPlates] = useState<GalleryPlate[]>(initialPlates);
+  const [photos, setPhotos] = useState<PhotoGalleryItem[]>(initialPhotos);
 
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() =>
     emptyProjectForm(initialProjects.length + 1)
   );
-  const [galleryForm, setGalleryForm] = useState<GalleryFormState>(() =>
-    emptyGalleryForm(initialPlates.length + 1)
+  const [photoForm, setPhotoForm] = useState<PhotoFormState>(() =>
+    emptyPhotoForm(initialPhotos.length + 1)
   );
 
   const [busy, setBusy] = useState(false);
@@ -208,8 +209,8 @@ export function AdminStudioClient({
       if (Array.isArray(p.projects)) setProjects(p.projects);
     }
     if (plateRes.ok) {
-      const g = (await plateRes.json()) as { plates?: GalleryPlate[] };
-      if (Array.isArray(g.plates)) setPlates(g.plates);
+      const g = (await plateRes.json()) as { photos?: PhotoGalleryItem[] };
+      if (Array.isArray(g.photos)) setPhotos(g.photos);
     }
   };
 
@@ -242,7 +243,7 @@ export function AdminStudioClient({
     await fetch("/api/admin/auth", { method: "DELETE" });
     setAuthenticated(false);
     setProjects([]);
-    setPlates([]);
+    setPhotos([]);
     setNotice(null);
   };
 
@@ -254,7 +255,7 @@ export function AdminStudioClient({
       const json = (await res.json()) as {
         error?: string;
         projectsInserted?: number;
-        platesInserted?: number;
+        photosInserted?: number;
       };
       if (!res.ok) {
         setNotice({ type: "err", text: json.error ?? "Seed gagal." });
@@ -263,7 +264,7 @@ export function AdminStudioClient({
       await refreshAll();
       setNotice({
         type: "ok",
-        text: `Neon Postgres siap! Ditambahkan ${json.projectsInserted ?? 0} Works & ${json.platesInserted ?? 0} Gallery plates.`,
+        text: `Neon Postgres siap! Ditambahkan ${json.projectsInserted ?? 0} Works & ${json.photosInserted ?? 0} Photo Gallery frames.`,
       });
     } catch {
       setNotice({ type: "err", text: "Gagal menghubungi /api/admin/seed." });
@@ -298,11 +299,11 @@ export function AdminStudioClient({
       if (folder === "projects") {
         setProjectForm((prev) => ({ ...prev, imageUrl: json.url! }));
       } else {
-        setGalleryForm((prev) => ({ ...prev, imageUrl: json.url! }));
+        setPhotoForm((prev) => ({ ...prev, imageUrl: json.url! }));
       }
       setNotice({
         type: "ok",
-        text: "Gambar berhasil di-upload ke Vercel Blob!",
+        text: "Foto berhasil di-upload ke Vercel Blob!",
       });
     } catch {
       setNotice({ type: "err", text: "Upload gagal karena error jaringan." });
@@ -401,7 +402,7 @@ export function AdminStudioClient({
     }
   };
 
-  const handleSaveGallery = async (e: FormEvent) => {
+  const handleSavePhoto = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setNotice(null);
@@ -410,56 +411,59 @@ export function AdminStudioClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: galleryForm.id,
-          code: galleryForm.code,
-          title: galleryForm.title,
-          category: galleryForm.category,
-          filterGroup: galleryForm.filterGroup,
-          scale: galleryForm.scale,
-          coords: galleryForm.coords,
-          year: galleryForm.year,
-          preset: galleryForm.preset,
-          visualType: galleryForm.visualType,
-          caption: galleryForm.caption,
-          imageUrl: galleryForm.imageUrl || null,
+          id: photoForm.id,
+          frame: photoForm.frame,
+          title: photoForm.title,
+          description: photoForm.description,
+          takenDate: photoForm.takenDate,
+          location: photoForm.location,
+          category: photoForm.category,
+          camera: photoForm.camera,
+          bentoSize: photoForm.bentoSize,
+          tone: photoForm.tone,
+          imageUrl: photoForm.imageUrl || null,
         }),
       });
-      const json = (await res.json()) as { error?: string; plate?: GalleryPlate };
+      const json = (await res.json()) as {
+        error?: string;
+        photo?: PhotoGalleryItem;
+      };
       if (!res.ok) {
-        setNotice({ type: "err", text: json.error ?? "Gagal menyimpan gallery." });
+        setNotice({ type: "err", text: json.error ?? "Gagal menyimpan foto." });
         return;
       }
       await refreshAll();
-      if (json.plate) setGalleryForm(plateToForm(json.plate));
+      if (json.photo) setPhotoForm(photoToForm(json.photo));
       setNotice({
         type: "ok",
-        text: `Gallery "${json.plate?.title}" tersimpan di Neon Postgres & live di /gallery!`,
+        text: `Foto "${json.photo?.title}" tersimpan di Neon Postgres & live di Photo Gallery!`,
       });
     } catch {
-      setNotice({ type: "err", text: "Gagal menyimpan gallery." });
+      setNotice({ type: "err", text: "Gagal menyimpan foto." });
     } finally {
       setBusy(false);
     }
   };
 
-  const handleDeleteGallery = async (id: string) => {
-    if (!window.confirm(`Hapus gallery item "${id}"?`)) return;
+  const handleDeletePhoto = async (id: string) => {
+    if (!window.confirm(`Hapus foto "${id}" dari Photo Gallery?`)) return;
     setBusy(true);
     setNotice(null);
     try {
-      const res = await fetch(`/api/admin/gallery?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/admin/gallery?id=${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
       const json = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setNotice({ type: "err", text: json.error ?? "Gagal menghapus gallery." });
+        setNotice({ type: "err", text: json.error ?? "Gagal menghapus foto." });
         return;
       }
       await refreshAll();
-      if (galleryForm.id === id) {
-        setGalleryForm(emptyGalleryForm(plates.length));
+      if (photoForm.id === id) {
+        setPhotoForm(emptyPhotoForm(photos.length));
       }
-      setNotice({ type: "ok", text: `Gallery "${id}" berhasil dihapus.` });
+      setNotice({ type: "ok", text: `Foto "${id}" berhasil dihapus.` });
     } finally {
       setBusy(false);
     }
@@ -496,7 +500,7 @@ export function AdminStudioClient({
               <span>
                 NEON:{" "}
                 {storage.dbConnected
-                  ? `LIVE (${storage.projectCount}W · ${storage.plateCount}G)`
+                  ? `LIVE (${storage.projectCount}W · ${storage.photoCount}P)`
                   : storage.dbConfigured
                     ? "ERROR"
                     : "NOT CONNECTED"}
@@ -638,7 +642,7 @@ export function AdminStudioClient({
                       : "border-black/15 bg-white/80 text-[#0D0E12] hover:border-[#0038FF]"
                   }`}
                 >
-                  GALLERY ({plates.length})
+                  PHOTO GALLERY ({photos.length})
                 </button>
               </div>
 
@@ -972,13 +976,13 @@ export function AdminStudioClient({
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>LIVE / GALLERY URL</label>
+                      <label className={labelClass}>LIVE / 3D LAB URL</label>
                       <input
                         value={projectForm.liveUrl}
                         onChange={(e) =>
                           setProjectForm((p) => ({ ...p, liveUrl: e.target.value }))
                         }
-                        placeholder="/gallery?preset=bridge"
+                        placeholder="/works?preset=bridge#lab"
                         className={inputClass}
                       />
                     </div>
@@ -1026,54 +1030,68 @@ export function AdminStudioClient({
                 </form>
               </div>
             ) : (
-              /* Gallery Manager */
+              /* Photography Bento Gallery Manager */
               <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
                 <div className="space-y-2.5 rounded-2xl border border-black/12 bg-white/80 p-4">
                   <div className="flex items-center justify-between pb-2">
                     <span className="font-mono text-[10px] font-semibold tracking-[0.18em] text-[#505562] uppercase">
-                      NEON GALLERY RECORDS
+                      NEON PHOTO RECORDS
                     </span>
                     <button
                       type="button"
-                      onClick={() => setGalleryForm(emptyGalleryForm(plates.length + 1))}
+                      onClick={() => setPhotoForm(emptyPhotoForm(photos.length + 1))}
                       className="inline-flex items-center gap-1 rounded-md bg-[#0D0E12] px-2.5 py-1 font-mono text-[9.5px] font-semibold tracking-[0.14em] text-white uppercase hover:bg-[#0038FF]"
                     >
                       <Plus className="h-3 w-3" />
-                      <span>NEW</span>
+                      <span>NEW PHOTO</span>
                     </button>
                   </div>
 
-                  {plates.length === 0 ? (
+                  {photos.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-black/15 p-4 text-xs text-[#505562]">
-                      Belum ada data gallery di Neon. Klik{" "}
-                      <strong>INIT &amp; SEED DEFAULTS</strong> atau upload foto/plate baru di sebelah kanan.
+                      Belum ada foto di Neon Postgres (website saat ini menampilkan 6 frame contoh Bento Grid). Klik{" "}
+                      <strong>INIT &amp; SEED DEFAULTS</strong> atau langsung upload foto hobi kamu di sebelah kanan.
                     </p>
                   ) : (
-                    plates.map((g) => (
+                    photos.map((ph) => (
                       <div
-                        key={g.id}
-                        className={`flex items-center justify-between gap-2 rounded-xl border p-3 transition-colors ${
-                          galleryForm.id === g.id
+                        key={ph.id}
+                        className={`flex items-center justify-between gap-2.5 rounded-xl border p-2.5 transition-colors ${
+                          photoForm.id === ph.id
                             ? "border-[#0038FF] bg-[#0038FF]/[0.06]"
                             : "border-black/10 bg-white hover:border-black/25"
                         }`}
                       >
                         <button
                           type="button"
-                          onClick={() => setGalleryForm(plateToForm(g))}
-                          className="min-w-0 flex-1 text-left"
+                          onClick={() => setPhotoForm(photoToForm(ph))}
+                          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                         >
-                          <p className="font-mono text-[9.5px] text-[#0038FF] uppercase">
-                            {g.code}
-                          </p>
-                          <p className="truncate font-display text-sm font-extrabold text-[#0D0E12] uppercase">
-                            {g.title}
-                          </p>
+                          {ph.imageUrl ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={ph.imageUrl}
+                              alt={ph.title}
+                              className="h-10 w-10 shrink-0 rounded-lg border border-black/10 object-cover"
+                            />
+                          ) : (
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-black/10 bg-[#0D0E12] font-mono text-[10px] font-bold text-[#6EA6FF]">
+                              {ph.frame}
+                            </span>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-mono text-[9px] text-[#0038FF] uppercase">
+                              {ph.frame} · {ph.bentoSize.toUpperCase()} · {ph.takenDate || "UNDATED"}
+                            </p>
+                            <p className="truncate font-display text-sm font-extrabold text-[#0D0E12] uppercase">
+                              {ph.title}
+                            </p>
+                          </div>
                         </button>
                         <button
                           type="button"
-                          onClick={() => void handleDeleteGallery(g.id)}
-                          aria-label={`Delete ${g.title}`}
+                          onClick={() => void handleDeletePhoto(ph.id)}
+                          aria-label={`Delete ${ph.title}`}
                           className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-black/12 text-red-600 hover:border-red-500 hover:bg-red-50"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -1083,31 +1101,31 @@ export function AdminStudioClient({
                   )}
                 </div>
 
-                {/* Gallery Form */}
+                {/* Photo Upload & Metadata Form */}
                 <form
-                  onSubmit={(e) => void handleSaveGallery(e)}
+                  onSubmit={(e) => void handleSavePhoto(e)}
                   className="space-y-4 rounded-2xl border border-black/12 bg-white/85 p-5 sm:p-7"
                 >
                   <div className="flex items-center justify-between border-b border-black/10 pb-3">
                     <h2 className="font-display text-lg font-extrabold text-[#0D0E12] uppercase">
-                      {galleryForm.id
-                        ? `EDIT GALLERY: ${galleryForm.id}`
-                        : "ADD PHOTO / BLUEPRINT PLATE"}
+                      {photoForm.id
+                        ? `EDIT PHOTO: ${photoForm.id}`
+                        : "UPLOAD PHOTO TO BENTO GALLERY"}
                     </h2>
                     <span className="font-mono text-[10px] text-[#0038FF] uppercase">
                       VERCEL BLOB STORAGE
                     </span>
                   </div>
 
-                  {/* Photo / Blueprint Upload -> Vercel Blob */}
+                  {/* Photo Upload -> Vercel Blob */}
                   <div className="rounded-xl border border-dashed border-black/20 bg-[#F6F7F9] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-mono text-[10px] font-semibold tracking-[0.16em] text-[#0D0E12] uppercase">
-                        UPLOAD PHOTO OR BLUEPRINT (JPG / PNG / WEBP · MAX 10MB)
+                        UPLOAD PHOTO (JPG / PNG / WEBP / AVIF · MAX 10MB)
                       </span>
                       <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#0038FF] px-3 py-1.5 font-mono text-[10px] font-semibold tracking-[0.14em] text-white uppercase hover:bg-[#0D0E12]">
                         <ImagePlus className="h-3.5 w-3.5" />
-                        <span>{uploading ? "UPLOADING..." : "CHOOSE IMAGE"}</span>
+                        <span>{uploading ? "UPLOADING..." : "CHOOSE PHOTO"}</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -1121,26 +1139,26 @@ export function AdminStudioClient({
                       </label>
                     </div>
 
-                    {galleryForm.imageUrl && (
+                    {photoForm.imageUrl && (
                       <div className="mt-3 flex items-center gap-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={galleryForm.imageUrl}
-                          alt="Gallery preview"
-                          className="h-16 w-28 rounded-lg border border-black/15 object-cover"
+                          src={photoForm.imageUrl}
+                          alt="Photo preview"
+                          className="h-20 w-28 rounded-lg border border-black/15 object-cover"
                         />
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-mono text-[10px] text-[#505562]">
-                            {galleryForm.imageUrl}
+                            {photoForm.imageUrl}
                           </p>
                           <button
                             type="button"
                             onClick={() =>
-                              setGalleryForm((g) => ({ ...g, imageUrl: "" }))
+                              setPhotoForm((g) => ({ ...g, imageUrl: "" }))
                             }
                             className="mt-1 font-mono text-[10px] font-semibold text-red-600 uppercase hover:underline"
                           >
-                            REMOVE IMAGE
+                            REMOVE PHOTO
                           </button>
                         </div>
                       </div>
@@ -1149,120 +1167,121 @@ export function AdminStudioClient({
 
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="sm:col-span-2">
-                      <label className={labelClass}>TITLE *</label>
+                      <label className={labelClass}>PHOTO TITLE *</label>
                       <input
                         required
-                        value={galleryForm.title}
+                        value={photoForm.title}
                         onChange={(e) =>
-                          setGalleryForm((g) => ({ ...g, title: e.target.value }))
+                          setPhotoForm((g) => ({ ...g, title: e.target.value }))
                         }
-                        placeholder="MAKASSAR BRIDGE SITE STUDY"
+                        placeholder="BLUE HOUR ALONG LOSARI PIER"
                         className={inputClass}
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>CODE</label>
+                      <label className={labelClass}>FRAME #</label>
                       <input
-                        value={galleryForm.code}
+                        value={photoForm.frame}
                         onChange={(e) =>
-                          setGalleryForm((g) => ({ ...g, code: e.target.value }))
+                          setPhotoForm((g) => ({ ...g, frame: e.target.value }))
                         }
+                        placeholder="01"
                         className={inputClass}
                       />
                     </div>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-4">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <div>
-                      <label className={labelClass}>FILTER GROUP</label>
-                      <select
-                        value={galleryForm.filterGroup}
+                      <label className={labelClass}>DATE *</label>
+                      <input
+                        type="date"
+                        required
+                        value={photoForm.takenDate}
                         onChange={(e) =>
-                          setGalleryForm((g) => ({
+                          setPhotoForm((g) => ({ ...g, takenDate: e.target.value }))
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelClass}>LOCATION *</label>
+                      <input
+                        required
+                        value={photoForm.location}
+                        onChange={(e) =>
+                          setPhotoForm((g) => ({ ...g, location: e.target.value }))
+                        }
+                        placeholder="Pantai Losari, Makassar"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label className={labelClass}>BENTO TILE SIZE</label>
+                      <select
+                        value={photoForm.bentoSize}
+                        onChange={(e) =>
+                          setPhotoForm((g) => ({
                             ...g,
-                            filterGroup: e.target.value as GalleryPlate["filterGroup"],
+                            bentoSize: e.target.value as PhotoBentoSize,
                           }))
                         }
                         className={inputClass}
                       >
-                        <option value="STRUCTURAL">STRUCTURAL</option>
-                        <option value="GEOSPATIAL">GEOSPATIAL</option>
-                        <option value="COMPUTATIONAL">COMPUTATIONAL</option>
-                        <option value="SOFTWARE">SOFTWARE</option>
+                        <option value="hero">HERO (2×2 LARGE)</option>
+                        <option value="wide">WIDE (2×1 LANDSCAPE)</option>
+                        <option value="tall">TALL (1×2 PORTRAIT)</option>
+                        <option value="square">SQUARE (1×1 COMPACT)</option>
                       </select>
                     </div>
                     <div>
                       <label className={labelClass}>CATEGORY</label>
-                      <input
-                        value={galleryForm.category}
-                        onChange={(e) =>
-                          setGalleryForm((g) => ({ ...g, category: e.target.value }))
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>YEAR</label>
-                      <input
-                        value={galleryForm.year}
-                        onChange={(e) =>
-                          setGalleryForm((g) => ({ ...g, year: e.target.value }))
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>LINKED 3D PRESET</label>
                       <select
-                        value={galleryForm.preset}
+                        value={photoForm.category}
                         onChange={(e) =>
-                          setGalleryForm((g) => ({
+                          setPhotoForm((g) => ({
                             ...g,
-                            preset: e.target.value as PointPresetId,
+                            category: e.target.value as PhotoCategory,
                           }))
                         }
                         className={inputClass}
                       >
-                        <option value="bridge">BRIDGE</option>
-                        <option value="terrain">TERRAIN</option>
-                        <option value="tower">TOWER</option>
-                        <option value="shell">SHELL</option>
+                        <option value="LANDSCAPE">LANDSCAPE</option>
+                        <option value="ARCHITECTURE">ARCHITECTURE</option>
+                        <option value="STREET">STREET</option>
+                        <option value="STAGE">STAGE</option>
+                        <option value="MONOCHROME">MONOCHROME</option>
                       </select>
                     </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className={labelClass}>SCALE / METADATA</label>
+                      <label className={labelClass}>CAMERA / LENS (OPT)</label>
                       <input
-                        value={galleryForm.scale}
+                        value={photoForm.camera}
                         onChange={(e) =>
-                          setGalleryForm((g) => ({ ...g, scale: e.target.value }))
+                          setPhotoForm((g) => ({ ...g, camera: e.target.value }))
                         }
-                        className={inputClass}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>COORDINATES / TAG</label>
-                      <input
-                        value={galleryForm.coords}
-                        onChange={(e) =>
-                          setGalleryForm((g) => ({ ...g, coords: e.target.value }))
-                        }
+                        placeholder="35mm · f/1.8"
                         className={inputClass}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className={labelClass}>CAPTION *</label>
+                    <label className={labelClass}>DESCRIPTION (SHOWN ON CLICK) *</label>
                     <textarea
                       required
                       rows={3}
-                      value={galleryForm.caption}
+                      value={photoForm.description}
                       onChange={(e) =>
-                        setGalleryForm((g) => ({ ...g, caption: e.target.value }))
+                        setPhotoForm((g) => ({
+                          ...g,
+                          description: e.target.value,
+                        }))
                       }
+                      placeholder="Cerita di balik foto ini..."
                       className={inputClass}
                     />
                   </div>
@@ -1273,7 +1292,7 @@ export function AdminStudioClient({
                     className="inline-flex items-center gap-2 rounded-lg bg-[#0038FF] px-5 py-3 font-mono text-xs font-semibold tracking-[0.18em] text-white uppercase transition-colors hover:bg-[#0D0E12] disabled:opacity-50"
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    <span>{busy ? "SAVING..." : "SAVE GALLERY TO NEON"}</span>
+                    <span>{busy ? "SAVING..." : "SAVE PHOTO TO NEON"}</span>
                   </button>
                 </form>
               </div>
