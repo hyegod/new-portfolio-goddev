@@ -4,8 +4,9 @@ import type { ProjectItem } from "@/data/portfolio";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import {
   deletePortfolioProject,
+  extractBlobTargetForDelete,
+  getBlobAuthOptions,
   getPortfolioProjectsStrict,
-  isBlobConfigured,
   isDatabaseConfigured,
   upsertPortfolioProject,
 } from "@/lib/db";
@@ -157,12 +158,15 @@ export async function DELETE(request: Request) {
 
   try {
     const { deletedImageUrl } = await deletePortfolioProject(id);
-    if (
-      deletedImageUrl &&
-      isBlobConfigured() &&
-      deletedImageUrl.includes(".blob.vercel-storage.com")
-    ) {
-      await del(deletedImageUrl).catch(() => {});
+    const blobAuth = getBlobAuthOptions();
+    const blobTarget = deletedImageUrl
+      ? extractBlobTargetForDelete(deletedImageUrl)
+      : null;
+    if (blobTarget && blobAuth) {
+      const authOpts = blobAuth.token
+        ? { token: blobAuth.token }
+        : { storeId: blobAuth.storeId };
+      await del(blobTarget, authOpts).catch(() => {});
     }
     revalidatePortfolioPages(id);
     return NextResponse.json({ ok: true, id });

@@ -1,7 +1,7 @@
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
-import { isBlobConfigured } from "@/lib/db";
+import { getBlobAuthOptions } from "@/lib/db";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -22,11 +22,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isBlobConfigured()) {
+  const blobAuth = getBlobAuthOptions();
+  if (!blobAuth) {
     return NextResponse.json(
       {
         error:
-          "BLOB_READ_WRITE_TOKEN belum terhubung. Buat Vercel Blob Store di Vercel Storage lalu redeploy.",
+          "Vercel Blob belum terhubung (tidak ditemukan BLOB_STORE_ID atau BLOB_READ_WRITE_TOKEN). Hubungkan Vercel Blob Store lalu redeploy.",
       },
       { status: 503 }
     );
@@ -58,16 +59,49 @@ export async function POST(request: Request) {
 
     const safeName = sanitizeFilename(file.name);
     const pathname = `portfolio/${folder}/${safeName}`;
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const authOpts = blobAuth.token
+      ? { token: blobAuth.token }
+      : { storeId: blobAuth.storeId };
 
-    const blob = await put(pathname, file, {
-      access: "public",
-      addRandomSuffix: true,
-      contentType: file.type,
-    });
+    const primaryAccess = blobAuth.preferPrivate ? "private" : "public";
+    const secondaryAccess = blobAuth.preferPrivate ? "public" : "private";
+
+    let usedAccess: "public" | "private" = primaryAccess;
+    let blob;
+    try {
+      blob = await put(pathname, fileBuffer, {
+        ...authOpts,
+        access: primaryAccess,
+        addRandomSuffix: true,
+        contentType: file.type,
+      });
+    } catch (firstErr) {
+      // Auto-retry with opposite access mode when store visibility differs from env heuristic
+      const msg = firstErr instanceof Error ? firstErr.message.toLowerCase() : "";
+      if (msg.includes("private") || msg.includes("public") || msg.includes("access")) {
+        usedAccess = secondaryAccess;
+        blob = await put(pathname, fileBuffer, {
+          ...authOpts,
+          access: secondaryAccess,
+          addRandomSuffix: true,
+          contentType: file.type,
+        });
+      } else {
+        throw firstErr;
+      }
+    }
+
+    // Private stores cannot be embedded directly via <img>; serve via cached /api/blob route
+    const displayUrl =
+      usedAccess === "private"
+        ? `/api/blob?path=${encodeURIComponent(blob.pathname)}`
+        : blob.url;
 
     return NextResponse.json({
-      url: blob.url,
+      url: displayUrl,
       pathname: blob.pathname,
+      access: usedAccess,
       size: file.size,
     });
   } catch (err) {

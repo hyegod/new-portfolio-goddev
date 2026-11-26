@@ -11,19 +11,95 @@ import {
 let cachedSql: NeonQueryFunction<false, false> | null = null;
 let tablesReady = false;
 
+export interface BlobAuthOptions {
+  token?: string;
+  storeId?: string;
+  preferPrivate: boolean;
+}
+
+export function getDatabaseUrl(): string | null {
+  const direct =
+    process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim();
+  if (direct) return direct;
+
+  for (const [key, raw] of Object.entries(process.env)) {
+    const val = raw?.trim();
+    if (!val) continue;
+    if (
+      (key.endsWith("_DATABASE_URL") || key.endsWith("_POSTGRES_URL")) &&
+      (val.startsWith("postgres://") || val.startsWith("postgresql://"))
+    ) {
+      return val;
+    }
+  }
+  return null;
+}
+
 export function isDatabaseConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL?.trim());
+  return Boolean(getDatabaseUrl());
+}
+
+/**
+ * Supports modern Vercel Blob OIDC (`BLOB_STORE_ID` — default for Private stores),
+ * classic read-write tokens (`BLOB_READ_WRITE_TOKEN`), and custom Storage prefixes.
+ */
+export function getBlobAuthOptions(): BlobAuthOptions | null {
+  const directStoreId = process.env.BLOB_STORE_ID?.trim();
+  const directToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  const hasOidcRuntime = Boolean(
+    process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL
+  );
+
+  if (directStoreId && (hasOidcRuntime || !directToken)) {
+    return { storeId: directStoreId, preferPrivate: true };
+  }
+  if (directToken) {
+    return { token: directToken, preferPrivate: Boolean(directStoreId) };
+  }
+
+  for (const [key, raw] of Object.entries(process.env)) {
+    const val = raw?.trim();
+    if (!val) continue;
+    if (key.endsWith("_STORE_ID") && val.startsWith("store_")) {
+      return { storeId: val, preferPrivate: true };
+    }
+    if (key.endsWith("_READ_WRITE_TOKEN") && val.startsWith("vercel_blob_rw_")) {
+      return { token: val, preferPrivate: false };
+    }
+  }
+
+  return null;
 }
 
 export function isBlobConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+  return Boolean(getBlobAuthOptions());
+}
+
+export function extractBlobTargetForDelete(imageUrl: string): string | null {
+  const trimmed = imageUrl.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes(".blob.vercel-storage.com")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/api/blob?")) {
+    try {
+      const parsed = new URL(trimmed, "https://local.invalid");
+      const pathname = parsed.searchParams.get("path")?.trim();
+      if (pathname && pathname.startsWith("portfolio/")) {
+        return pathname;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
  * Lazy Neon SQL initializer — safe at build time when DATABASE_URL is not yet provisioned.
  */
 export function getSql(): NeonQueryFunction<false, false> | null {
-  const url = process.env.DATABASE_URL?.trim();
+  const url = getDatabaseUrl();
   if (!url) return null;
   if (!cachedSql) {
     cachedSql = neon(url);
