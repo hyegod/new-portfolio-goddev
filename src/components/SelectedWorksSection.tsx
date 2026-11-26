@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Pause, Play } from "lucide-react";
 import { motion } from "motion/react";
-import { PROJECTS } from "@/data/portfolio";
+import { PROJECTS, type ProjectItem } from "@/data/portfolio";
 import { useNearViewport, usePerformanceProfile } from "@/lib/devicePerf";
 import {
   generatePresetPointCloud,
@@ -13,8 +13,13 @@ import {
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
 import { GitHubWorksPanel } from "./GitHubWorksPanel";
 
-export function SelectedWorksSection() {
-  const [activeId, setActiveId] = useState<string>(PROJECTS[0].id);
+export function SelectedWorksSection({
+  projects = PROJECTS,
+}: {
+  projects?: ProjectItem[];
+}) {
+  const list = projects.length > 0 ? projects : PROJECTS;
+  const [activeId, setActiveId] = useState<string>(list[0].id);
   const [previewDark, setPreviewDark] = useState<boolean>(true);
   const [previewPaused, setPreviewPaused] = useState<boolean>(false);
   const previewStageRef = useRef<HTMLDivElement>(null);
@@ -24,7 +29,7 @@ export function SelectedWorksSection() {
   const isNearPreview = useNearViewport(previewStageRef, "550px 0px");
 
   const activeProject =
-    PROJECTS.find((p) => p.id === activeId) ?? PROJECTS[0];
+    list.find((p) => p.id === activeId) ?? list[0];
 
   // Generate ONLY the active preset on demand once #works nears the viewport, cached per session
   const activeCloud = useMemo(() => {
@@ -82,7 +87,7 @@ export function SelectedWorksSection() {
         {/* Two-Column Clean Project Cards + Sticky Live 3D Structural Preview */}
         <div className="grid min-w-0 gap-8 sm:gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
           <div data-anim="stagger-group" className="min-w-0 space-y-3.5 sm:space-y-4">
-            {PROJECTS.map((project) => {
+            {list.map((project) => {
               const isActive = project.id === activeProject.id;
 
               return (
@@ -273,7 +278,7 @@ export function SelectedWorksSection() {
                     previewDark ? "glass-obsidian" : "glass-vellum"
                   }`}
                 >
-                  {PROJECTS.map((proj) => {
+                  {list.map((proj) => {
                     const selected = proj.id === activeProject.id;
                     return (
                       <button

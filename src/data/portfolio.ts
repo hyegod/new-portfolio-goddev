@@ -27,6 +27,7 @@ export interface ProjectItem {
   metrics: { label: string; value: string }[];
   stack: string[];
   liveUrl: string;
+  imageUrl?: string | null;
 }
 
 export type SkillTier = "CORE" | "DAILY" | "SPEC";
@@ -59,6 +60,7 @@ export interface GalleryPlate {
   preset: PointPresetId;
   visualType: "bridge-elevation" | "tower-section" | "lidar-contour" | "shell-grid" | "rebar-detail" | "bim-pipeline";
   caption: string;
+  imageUrl?: string | null;
 }
 
 export interface GatherSwatch {

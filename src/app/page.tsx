@@ -7,8 +7,19 @@ import { PortfolioExperience } from "@/components/PortfolioExperience";
 import { SelectedWorksSection } from "@/components/SelectedWorksSection";
 import { SkillSection } from "@/components/SkillSection";
 import { SloganSection } from "@/components/SloganSection";
+import {
+  getPortfolioGalleryPlates,
+  getPortfolioProjects,
+} from "@/lib/db";
 
-export default function HomePage() {
+export const revalidate = 60;
+
+export default async function HomePage() {
+  const [projects, plates] = await Promise.all([
+    getPortfolioProjects(),
+    getPortfolioGalleryPlates(),
+  ]);
+
   return (
     <PortfolioExperience>
       <Navbar />
@@ -17,8 +28,8 @@ export default function HomePage() {
         <AboutSection />
         <SloganSection />
         <SkillSection />
-        <SelectedWorksSection />
-        <GallerySection />
+        <SelectedWorksSection projects={projects.slice(0, 4)} />
+        <GallerySection plates={plates.slice(0, 6)} />
         <ContactFooter />
       </main>
     </PortfolioExperience>

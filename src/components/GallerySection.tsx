@@ -243,9 +243,12 @@ function BlueprintGraphic({
 
 export function GallerySection({
   standalone = false,
+  plates = GALLERY_PLATES,
 }: {
   standalone?: boolean;
+  plates?: GalleryPlate[];
 }) {
+  const plateList = plates.length > 0 ? plates : GALLERY_PLATES;
   const sectionRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -293,9 +296,9 @@ export function GallerySection({
   const activeEntry = specimens[activeIndex] ?? specimens[0];
 
   const visiblePlates = useMemo(() => {
-    if (!standalone || activePlateFilter === "ALL") return GALLERY_PLATES;
-    return GALLERY_PLATES.filter((p) => p.filterGroup === activePlateFilter);
-  }, [standalone, activePlateFilter]);
+    if (!standalone || activePlateFilter === "ALL") return plateList;
+    return plateList.filter((p) => p.filterGroup === activePlateFilter);
+  }, [standalone, activePlateFilter, plateList]);
 
   // Support deep-linking from /works/[slug] via /gallery?preset=bridge|tower|terrain|shell
   useEffect(() => {
@@ -497,7 +500,7 @@ export function GallerySection({
 
           <span className="font-mono text-[10px] tracking-[0.18em] text-[#505562] uppercase">
             {String(BUILTIN_PRESETS.length).padStart(2, "0")} 3D SPECIMENS ·{" "}
-            {String(GALLERY_PLATES.length).padStart(2, "0")} TECHNICAL SHEETS
+            {String(plateList.length).padStart(2, "0")} TECHNICAL SHEETS
           </span>
         </div>
       )}
@@ -1009,7 +1012,17 @@ export function GallerySection({
               </div>
 
               <div className="aspect-[16/10] w-full overflow-hidden border-b border-black/10 bg-[#F6F7F9] text-[#0D0E12] transition-transform duration-300 group-hover:scale-[1.015]">
-                <BlueprintGraphic type={plate.visualType} />
+                {plate.imageUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={plate.imageUrl}
+                    alt={plate.title}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <BlueprintGraphic type={plate.visualType} />
+                )}
               </div>
 
               <div className="flex flex-1 flex-col justify-between gap-3 p-4 sm:p-5">
@@ -1095,7 +1108,16 @@ export function GallerySection({
             </div>
 
             <div className="mt-4 aspect-[16/10] w-full overflow-hidden rounded-xl border border-black/15 bg-white text-[#0D0E12] sm:mt-5">
-              <BlueprintGraphic type={activePlate.visualType} />
+              {activePlate.imageUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={activePlate.imageUrl}
+                  alt={activePlate.title}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <BlueprintGraphic type={activePlate.visualType} />
+              )}
             </div>
 
             <div className="mt-4 flex flex-col justify-between gap-4 sm:mt-5 sm:flex-row sm:items-end">

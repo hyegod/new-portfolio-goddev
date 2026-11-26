@@ -17,13 +17,18 @@ const DISCIPLINE_FILTERS: DisciplineFilter[] = [
   "SOFTWARE / GIS",
 ];
 
-export function WorksArchiveClient() {
+export function WorksArchiveClient({
+  projects = PROJECTS,
+}: {
+  projects?: ProjectItem[];
+}) {
+  const list = projects.length > 0 ? projects : PROJECTS;
   const [activeFilter, setActiveFilter] = useState<DisciplineFilter>("ALL");
 
   const filteredProjects =
     activeFilter === "ALL"
-      ? PROJECTS
-      : PROJECTS.filter((p) => p.discipline === activeFilter);
+      ? list
+      : list.filter((p) => p.discipline === activeFilter);
 
   return (
     <section className="relative border-b border-black/15 px-3 pt-28 pb-16 min-[380px]:px-4 sm:px-8 sm:pt-32 sm:pb-24 lg:px-12">
@@ -39,7 +44,7 @@ export function WorksArchiveClient() {
           </Link>
 
           <span className="font-mono text-[10px] tracking-[0.18em] text-[#505562] uppercase">
-            {String(PROJECTS.length).padStart(2, "0")} CASE STUDIES · LIVE GITHUB ARCHIVE
+            {String(list.length).padStart(2, "0")} CASE STUDIES · LIVE GITHUB ARCHIVE
           </span>
         </div>
 
@@ -132,6 +137,18 @@ export function WorksArchiveClient() {
                     <ArrowUpRight className="h-4 w-4" />
                   </Link>
                 </div>
+
+                {project.imageUrl && (
+                  <div className="mt-4 aspect-[16/9] w-full overflow-hidden rounded-xl border border-black/10 bg-[#ECEEF0]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={project.imageUrl}
+                      alt={project.title}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    />
+                  </div>
+                )}
 
                 <p className="mt-4 text-[13.5px] leading-relaxed text-[#454A57] sm:text-sm">
                   {project.summary}

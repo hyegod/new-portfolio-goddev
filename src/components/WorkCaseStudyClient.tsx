@@ -195,6 +195,20 @@ export function WorkCaseStudyClient({
           </div>
         </div>
 
+        {/* Optional Uploaded Vercel Blob Cover Image */}
+        {project.imageUrl && (
+          <div className="reveal-up mb-10 overflow-hidden rounded-2xl border border-black/12 bg-white/85 shadow-[0_18px_40px_-18px_rgba(13,14,18,0.14)] sm:mb-12">
+            <div className="aspect-[16/9] w-full overflow-hidden bg-[#ECEEF0]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={project.imageUrl}
+                alt={`${project.title} visual documentation`}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          </div>
+        )}
+
         {/* 3 Key Telemetry Metrics */}
         <div
           data-anim="stagger-group"

@@ -4,12 +4,10 @@ import { ContactFooter } from "@/components/ContactFooter";
 import { Navbar } from "@/components/Navbar";
 import { PortfolioExperience } from "@/components/PortfolioExperience";
 import { WorkCaseStudyClient } from "@/components/WorkCaseStudyClient";
-import {
-  getAdjacentProjects,
-  getProjectBySlug,
-  PORTFOLIO_PROFILE,
-  PROJECTS,
-} from "@/data/portfolio";
+import { PORTFOLIO_PROFILE, PROJECTS } from "@/data/portfolio";
+import { getPortfolioProjects } from "@/lib/db";
+
+export const revalidate = 60;
 
 export function generateStaticParams() {
   return PROJECTS.map((project) => ({ slug: project.id }));
@@ -21,7 +19,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const project = getProjectBySlug(slug);
+  const projects = await getPortfolioProjects();
+  const project = projects.find((p) => p.id === slug);
   if (!project) {
     return {
       title: `Work Not Found — ${PORTFOLIO_PROFILE.fullName}`,
@@ -39,12 +38,15 @@ export default async function WorkDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const project = getProjectBySlug(slug);
-  if (!project) {
+  const projects = await getPortfolioProjects();
+  const idx = projects.findIndex((p) => p.id === slug);
+  if (idx < 0) {
     notFound();
   }
 
-  const { prev, next } = getAdjacentProjects(slug);
+  const project = projects[idx];
+  const prev = projects[(idx - 1 + projects.length) % projects.length];
+  const next = projects[(idx + 1) % projects.length];
 
   return (
     <PortfolioExperience>
@@ -54,7 +56,7 @@ export default async function WorkDetailPage({
           project={project}
           prevProject={prev}
           nextProject={next}
-          totalProjects={PROJECTS.length}
+          totalProjects={projects.length}
         />
       </main>
       <ContactFooter />
