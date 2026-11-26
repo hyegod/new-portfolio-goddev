@@ -447,24 +447,6 @@ dialog.editorial-dialog::backdrop {
   color: #ffffff;
 }
 
-/* Calibrated Architectural Vernier Ruler Hairlines (Zero DOM nodes, crisp 1px at any width) */
-.datum-ruler-ticks {
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      rgba(13, 14, 18, 0.32) 0 1px,
-      transparent 1px 80px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(13, 14, 18, 0.14) 0 1px,
-      transparent 1px 16px
-    );
-  background-size: 100% 13px, 100% 6px;
-  background-position: left top, left top;
-  background-repeat: no-repeat;
-}
-
 /* ============================================================================
    PRECISION CAD CUSTOM CURSOR (Desktop Fine-Pointer Only; Native Inside Dialogs/Inputs)
    ============================================================================ */
