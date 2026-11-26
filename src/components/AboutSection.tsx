@@ -34,18 +34,19 @@ export function AboutSection() {
 
             <div className="reveal-up glass-vellum min-w-0 space-y-3 rounded-2xl border-l-2 border-l-[#0038FF] p-4 sm:p-6 lg:mt-2">
               <p className="font-mono text-[9.5px] font-semibold tracking-[0.18em] text-[#0038FF] uppercase sm:text-[10px] sm:tracking-[0.22em]">
-                PERSONAL PROFILE // DUAL DISCIPLINE
+                PERSONAL PROFILE // CIVIL × CODE × CRAFT
               </p>
               <p className="text-[15px] font-semibold leading-snug text-[#0D0E12] sm:text-base">
-                {PORTFOLIO_PROFILE.fullName} — Civil Engineer by degree,
-                Software Engineer by craft.
+                {PORTFOLIO_PROFILE.fullName} — Civil Engineering student at
+                Bosowa University &amp; Full-Stack Software Developer.
               </p>
               <p className="text-[13px] leading-relaxed text-[#363B47] sm:text-sm">
-                I work at the intersection of concrete reality and computational
-                software. On one side, I analyze seismic frames, bridges, and
-                site grading to structural codes; on the other, I write
-                TypeScript, Python, BIM plugins, and real-time WebGL tools that
-                turn complex engineering data into fast, visual software.
+                I combine civil engineering logic with software craftsmanship —
+                designing buildings, seismic frames, and BIM workflows alongside
+                full-stack web, mobile, and 3D interactive apps. Off the clock,
+                music is my creative escape through playing bass, while
+                photography and videography let me capture everyday stories
+                through a lens.
               </p>
             </div>
           </div>
@@ -104,8 +105,8 @@ export function AboutSection() {
         {/* Personal Experience & Engineering Track Record */}
         <div className="mt-12 sm:mt-14">
           <div className="reveal-up mb-5 flex items-center justify-between font-mono text-[11px] tracking-[0.22em] text-[#505562] uppercase">
-            <span>EXPERIENCE LEDGER</span>
-            <span className="hidden sm:inline">FIELD × COMPUTATIONAL</span>
+            <span>MY TIMELINE // EDUCATION &amp; EXPERIENCE</span>
+            <span className="hidden sm:inline">BOSOWA × SOFTWARE DEV</span>
           </div>
           <div
             data-anim="slide-group"

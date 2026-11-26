@@ -38,34 +38,35 @@ const permanentMarker = Permanent_Marker({
 
 export const metadata: Metadata = {
   title: {
-    default: "Kairo Pratama, S.T. — Civil Engineer & Software Engineer",
+    default: "Godlift Farrelio — Civil Engineering & Software Development",
     template: "%s",
   },
   description:
-    "Personal portfolio of Kairo Pratama — Civil Engineer & Software Engineer uniting structural infrastructure, BIM automation, full-stack systems, and 3D WebGL LiDAR point clouds.",
+    "Personal portfolio of Godlift Farrelio — Civil Engineering student at Bosowa University & Full-Stack Software Developer uniting structures, code, 3D WebGL, bass music, and photography.",
   keywords: [
-    "Civil Engineer",
-    "Software Engineer",
-    "Structural Engineering",
+    "Godlift Farrelio",
+    "Civil Engineering",
+    "Software Developer",
+    "Full-Stack Developer",
+    "Bosowa University",
     "BIM Automation",
     "Three.js",
     "WebGL",
-    "LiDAR Point Cloud",
     "Next.js Portfolio",
   ],
-  authors: [{ name: "Kairo Pratama, S.T." }],
+  authors: [{ name: "Godlift Farrelio" }],
   openGraph: {
     type: "website",
-    title: "Kairo Pratama, S.T. — Civil Engineer & Software Engineer",
+    title: "Godlift Farrelio — Civil Engineering × Software Development",
     description:
-      "Bridging structural engineering, BIM automation, full-stack software, and interactive 3D WebGL LiDAR point clouds.",
-    siteName: "KAIRO // CIVIL × SWE",
+      "Civil Engineering student at Bosowa University & Full-Stack Software Developer from Indonesia — uniting structures, code, music, and visual storytelling.",
+    siteName: "GODLIFT // CIVIL × SWE",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Kairo Pratama, S.T. — Civil Engineer & Software Engineer",
+    title: "Godlift Farrelio — Civil Engineering × Software Development",
     description:
-      "Structural infrastructure, BIM automation, full-stack systems, and interactive 3D WebGL LiDAR point clouds.",
+      "Civil Engineering, Full-Stack Software Development, 3D WebGL LiDAR, Bass Music & Photography — Indonesia.",
   },
   robots: {
     index: true,

@@ -125,9 +125,9 @@ export function ContactFooter() {
             </div>
 
             <p className="text-[13.5px] leading-relaxed text-white/75 sm:text-sm">
-              Open to structural &amp; BIM automation projects, full-stack
-              software roles, interactive WebGL digital twins, or technical
-              collaborations.
+              Open to full-stack web &amp; mobile projects, civil &amp; BIM
+              collaborations, interactive 3D builds — or a casual chat about
+              engineering, bass music, and photography.
             </p>
 
             <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
@@ -160,7 +160,7 @@ export function ContactFooter() {
             </div>
 
             <p className="border-t border-white/10 pt-3.5 font-mono text-[9.5px] tracking-[0.14em] text-white/45 uppercase">
-              CIVIL × BIM · FULL-STACK WEB &amp; MOBILE · 3D WEBGL
+              CIVIL × BIM · FULL-STACK WEB &amp; MOBILE · BASS &amp; PHOTO
             </p>
           </div>
         </div>

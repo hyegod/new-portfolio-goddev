@@ -225,7 +225,7 @@ export function HeroSection() {
                 className="absolute inset-0 flex flex-col items-center justify-center text-center"
               >
                 <h1 className="sr-only">
-                  {PORTFOLIO_PROFILE.fullName} — Civil Engineer &amp; Software Engineer.
+                  {PORTFOLIO_PROFILE.fullName} — Civil Engineering Student &amp; Software Developer.
                   Go Hard, Build Solid Infrastructure and Modern Software.
                 </h1>
                 <span
@@ -252,13 +252,13 @@ export function HeroSection() {
               00 // {PORTFOLIO_PROFILE.fullName} — {PORTFOLIO_PROFILE.tagline}
             </p>
             <p className="max-w-2xl text-[13px] font-medium leading-snug text-[#0D0E12] sm:text-base">
-              Hi, I&apos;m {PORTFOLIO_PROFILE.brand} — a{" "}
-              <span className="font-bold text-[#0038FF]">Civil Engineer</span>{" "}
-              &amp;{" "}
+              Hi, I&apos;m {PORTFOLIO_PROFILE.fullName} — a{" "}
+              <span className="font-bold text-[#0038FF]">Civil Engineering</span>{" "}
+              student &amp;{" "}
               <span className="font-bold text-[#0D0E12] underline decoration-[#0038FF]/60 decoration-2 underline-offset-4">
-                Software Engineer
+                Software Developer
               </span>{" "}
-              bridging structural infrastructure, BIM automation, and interactive 3D web systems.
+              uniting structural design, full-stack code, bass music, and visual craft.
             </p>
           </div>
 

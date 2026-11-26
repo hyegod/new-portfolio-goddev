@@ -67,29 +67,28 @@ export interface GatherSwatch {
   hex: string;
 }
 
-// TODO: Replace placeholder name, email, and links with your personal details.
 export const PORTFOLIO_PROFILE = {
-  brand: "KAIRO",
-  fullName: "Kairo Pratama, S.T.",
+  brand: "GODLIFT",
+  monogram: "G",
+  fullName: "Godlift Farrelio",
   githubUsername: "hyegod",
   jpMark: "構造・開発",
-  tagline: "CIVIL ENGINEER & SOFTWARE ENGINEER",
-  location: "INDONESIA · AVAILABLE WORLDWIDE",
+  tagline: "CIVIL ENGINEERING × SOFTWARE DEVELOPMENT",
+  location: "MAKASSAR, INDONESIA · AVAILABLE WORLDWIDE",
   availability: "OPEN FOR ENGINEERING & SOFTWARE ROLES",
-  email: "hello@kairo.dev",
+  email: "godliftmailbox@gmail.com",
   socials: [
     { label: "GITHUB", href: "https://github.com/hyegod" },
-    { label: "LINKEDIN", href: "https://linkedin.com" },
-    { label: "X / TWITTER", href: "https://x.com" },
-    { label: "INSTAGRAM", href: "https://instagram.com" },
+    { label: "LINKEDIN", href: "https://linkedin.com/in/godlift-farrelio" },
+    { label: "INSTAGRAM", href: "https://instagram.com/godliftfarrelio" },
   ],
 };
 
 export const ABOUT_STATS = [
-  { label: "DUAL DISCIPLINE", value: "CIVIL × SWE" },
-  { label: "FIELD & CODE", value: "5+ YRS" },
-  { label: "SHIPPED SYSTEMS", value: "24+ APPS" },
-  { label: "DESIGN CODES", value: "SNI · ACI · AISC" },
+  { label: "DUAL TRACK", value: "CIVIL × SWE" },
+  { label: "CODING SINCE", value: "2021 — NOW" },
+  { label: "UNIVERSITY", value: "BOSOWA UNIV." },
+  { label: "CREATIVE", value: "BASS · PHOTO" },
 ];
 
 // Technical Spec Sheet pillars — easily extensible by adding items or appending strings to `tools`.
@@ -176,11 +175,11 @@ export const SKILL_PILLARS: SkillPillar[] = [
         tools: ["PostgreSQL", "MongoDB", "MySQL", "Supabase", "Firebase", "AWS", "Azure", "GCP"],
       },
       {
-        name: "DevOps & Workflow Tooling",
+        name: "DevOps, Auth & Tooling",
         tier: "SPEC",
         detail:
-          "Containerized builds, CI/CD version control, API testing, and cluster orchestration.",
-        tools: ["Docker", "Kubernetes", "Git", "GitHub", "GitLab", "Bitbucket", "Postman", "GraphQL"],
+          "Containerized builds, auth protocols, real-time sockets, API testing, and version control.",
+        tools: ["Docker", "Kubernetes", "Git", "GitHub", "GitLab", "Bitbucket", "Postman", "GraphQL", "JWT / OAuth", "WebSockets"],
       },
     ],
   },
@@ -221,11 +220,11 @@ export const SKILL_PILLARS: SkillPillar[] = [
         tools: ["GSAP", "Lenis", "Motion", "Tailwind v4"],
       },
       {
-        name: "Audio & Creative Production",
+        name: "Music, Bass & Visual Media",
         tier: "SPEC",
         detail:
-          "Sound design, interactive audio-visual concepts, and digital music production.",
-        tools: ["Ableton Live", "FL Studio"],
+          "Bass-driven music production, DAW sound design, and visual storytelling through photography & film.",
+        tools: ["Ableton Live", "FL Studio", "Bass Guitar", "Photography", "Videography"],
       },
     ],
   },
@@ -240,8 +239,8 @@ export const PROJECTS: ProjectItem[] = [
     category: "STRUCTURAL / WEBGL",
     discipline: "STRUCTURAL / WEBGL",
     year: "2026",
-    role: "Civil & Software Engineer",
-    client: "Infrastructure Telemetry R&D",
+    role: "Civil & Software Developer",
+    client: "Computational Structural R&D",
     duration: "4 MONTHS",
     preset: "bridge",
     accent: "cobalt",
@@ -346,8 +345,8 @@ export const PROJECTS: ProjectItem[] = [
     category: "COMPUTATIONAL BIM",
     discipline: "COMPUTATIONAL BIM",
     year: "2025",
-    role: "Structural & Automation Engineer",
-    client: "High-Rise Structural Consultants",
+    role: "Structural & BIM Developer",
+    client: "Seismic & BIM Automation Lab",
     duration: "5 MONTHS",
     preset: "tower",
     accent: "cobalt",
@@ -469,7 +468,7 @@ export const GALLERY_PLATES: GalleryPlate[] = [
     category: "STRUCTURAL / BRIDGE",
     filterGroup: "STRUCTURAL",
     scale: "SCALE 1:500",
-    coords: "-6.2088° S, 106.8456° E",
+    coords: "-5.1477° S, 119.4327° E",
     year: "2026",
     preset: "bridge",
     visualType: "bridge-elevation",
@@ -497,7 +496,7 @@ export const GALLERY_PLATES: GalleryPlate[] = [
     category: "GEOSPATIAL / CIVIL 3D",
     filterGroup: "GEOSPATIAL",
     scale: "INTERVAL 0.50 M",
-    coords: "UTM 48S · WGS84",
+    coords: "UTM 50S · WGS84",
     year: "2025",
     preset: "terrain",
     visualType: "lidar-contour",
@@ -550,22 +549,28 @@ export const GALLERY_PLATES: GalleryPlate[] = [
 
 export const EXPERIENCE = [
   {
-    period: "2025 — NOW",
-    role: "CIVIL & SOFTWARE ENGINEER",
-    company: "INDEPENDENT / COMPUTATIONAL AEC",
-    note: "Building custom structural automation tools, WebGL digital twins, and full-stack engineering web platforms.",
+    period: "2024 — NOW",
+    role: "CIVIL ENGINEERING STUDENT",
+    company: "BOSOWA UNIVERSITY · MAKASSAR",
+    note: "Studying structural analysis, concrete & steel design, and construction systems while merging civil engineering logic with modern computational software.",
   },
   {
-    period: "2023 — 2025",
-    role: "STRUCTURAL ENGINEER & BIM DEVELOPER",
-    company: "NUSA INFRASTRUCTURE CONSULTANTS",
-    note: "Designed high-rise RC frames & bridges while authoring Python/Revit API plugins that cut detailing hours by 55%.",
+    period: "2024 — 2025",
+    role: "FULL-STACK DEVELOPER",
+    company: "PT. LINY JAYA INFORMATIKA",
+    note: "Engineered production web applications, backend APIs, and database-driven platforms across modern frontend architecture and server infrastructure.",
   },
   {
-    period: "2021 — 2023",
-    role: "JUNIOR CIVIL ENGINEER & FRONTEND DEV",
-    company: "ARCHIFORM ENGINEERING LAB",
-    note: "Delivered site grading plans in Civil 3D alongside internal web dashboards for project telemetry and BOQ tracking.",
+    period: "2021 — 2025",
+    role: "FREELANCE SOFTWARE DEVELOPER",
+    company: "INDEPENDENT",
+    note: "Built custom full-stack web apps, cross-platform mobile interfaces, and interactive visual experiences for clients and personal open-source releases.",
+  },
+  {
+    period: "2021 — 2024",
+    role: "SOFTWARE ENGINEERING (RPL)",
+    company: "TELKOM VOCATIONAL SCHOOL",
+    note: "Grounded in polyglot programming, web & mobile frameworks, relational & NoSQL databases, API design, and collaborative software delivery.",
   },
 ];
 

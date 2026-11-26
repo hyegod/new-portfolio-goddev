@@ -106,7 +106,7 @@ export function Navbar() {
               transition={{ type: "spring", stiffness: 420, damping: 24 }}
               className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#0D0E12] font-mono text-[10px] font-bold text-white transition-colors group-hover:bg-[#0038FF]"
             >
-              K
+              {PORTFOLIO_PROFILE.monogram}
             </motion.span>
             <span className="text-trim font-display text-xs font-extrabold tracking-[0.14em] text-[#0D0E12] uppercase min-[380px]:text-sm min-[380px]:tracking-[0.22em]">
               {PORTFOLIO_PROFILE.brand}
