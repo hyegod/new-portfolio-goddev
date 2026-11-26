@@ -28,13 +28,14 @@ export type VgpuShaderId =
   | "black-hole"
   | "video-texture";
 
-export type VgpuStatus = "loading" | "ready" | "unsupported";
+export type VgpuStatus = "loading" | "webgpu" | "webgl" | "unsupported";
 
 export interface VgpuCanvasProps {
   shaderId: VgpuShaderId;
   ambient?: boolean;
   paused?: boolean;
   maxDpr?: number;
+  forceWebgl?: boolean;
   videoElement?: HTMLVideoElement | null;
   onStatusChange?: (status: VgpuStatus) => void;
   className?: string;
@@ -138,6 +139,7 @@ export function VgpuCanvas({
   ambient = false,
   paused = false,
   maxDpr = 2,
+  forceWebgl = false,
   videoElement = null,
   onStatusChange,
   className = "",
@@ -145,7 +147,14 @@ export function VgpuCanvas({
 }: VgpuCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [engineMode, setEngineMode] = useState<"auto" | "webgl">(
+    forceWebgl ? "webgl" : "auto"
+  );
   const [status, setStatus] = useState<VgpuStatus>("loading");
+
+  useEffect(() => {
+    setEngineMode(forceWebgl ? "webgl" : "auto");
+  }, [forceWebgl, shaderId]);
 
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
@@ -170,18 +179,11 @@ export function VgpuCanvas({
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    if (
-      typeof navigator === "undefined" ||
-      !("gpu" in navigator) ||
-      !navigator.gpu
-    ) {
-      notify("unsupported");
-      return;
-    }
-
     let cancelled = false;
     let gpu: Gpu | null = null;
+    let webglHandle: { dispose: () => void } | null = null;
     let isVisible = true;
+    let canvasTouchedByWebgpu = false;
 
     // Interactive pointer & orbit state stored in closure (zero React rerenders)
     const ptr = {
@@ -282,259 +284,329 @@ export function VgpuCanvas({
     );
     io.observe(container);
 
-    // Offscreen procedural video feed canvas for "video-texture" mode
-    const videoW = 512;
-    const videoH = 320;
-    let feedCanvas: HTMLCanvasElement | null = null;
-    let feedCtx: CanvasRenderingContext2D | null = null;
-
-    if (shaderId === "video-texture") {
-      feedCanvas = document.createElement("canvas");
-      feedCanvas.width = videoW;
-      feedCanvas.height = videoH;
-      feedCtx = feedCanvas.getContext("2d");
-    }
-
-    (async () => {
+    const launchWebglFallback = async () => {
       try {
-        notify("loading");
-        const instance = await init({
-          powerPreference: "high-performance",
-          label: `goddev-vgpu-${shaderId}`,
+        const { startWebglShaderFallback } = await import(
+          "@/lib/vgpuWebglFallback"
+        );
+        if (cancelled) return;
+        const handle = startWebglShaderFallback({
+          canvas,
+          shaderId,
+          ambient,
+          maxDpr,
+          reducedMotion,
+          ptr,
+          isVisible: () => isVisible,
+          isPaused: () => pausedRef.current,
+          getVideoElement: () => videoRef.current,
+          drawProceduralFeed: drawProceduralVideoFeed,
         });
-
         if (cancelled) {
-          instance.dispose();
+          handle?.dispose();
           return;
         }
-        gpu = instance;
+        if (handle) {
+          webglHandle = handle;
+          notify("webgl");
+        } else {
+          notify("unsupported");
+        }
+      } catch {
+        if (!cancelled) notify("unsupported");
+      }
+    };
 
-        const canvasSurface = surface(instance, canvas, {
-          dpr: [1, Math.max(1, maxDpr)],
-        });
-        const gpuClock = clock(instance);
+    const hasWebgpuApi =
+      engineMode === "auto" &&
+      typeof navigator !== "undefined" &&
+      "gpu" in navigator &&
+      Boolean(navigator.gpu);
 
-        // Compile the active shader pipeline(s)
-        if (shaderId === "fluid") {
-          const pp = pingPong(instance, 512, 512, { format: "rgba16float" });
-          const lin = sampler(instance, {
-            magFilter: "linear",
-            minFilter: "linear",
-            addressModeU: "clamp-to-edge",
-            addressModeV: "clamp-to-edge",
+    if (!hasWebgpuApi) {
+      notify("loading");
+      void launchWebglFallback();
+    } else {
+      // Offscreen procedural video feed canvas for "video-texture" mode
+      const videoW = 512;
+      const videoH = 320;
+      let feedCanvas: HTMLCanvasElement | null = null;
+      let feedCtx: CanvasRenderingContext2D | null = null;
+
+      if (shaderId === "video-texture") {
+        feedCanvas = document.createElement("canvas");
+        feedCanvas.width = videoW;
+        feedCanvas.height = videoH;
+        feedCtx = feedCanvas.getContext("2d");
+      }
+
+      (async () => {
+        try {
+          notify("loading");
+          let instance: Gpu;
+          try {
+            instance = await init({
+              powerPreference: "high-performance",
+              label: `goddev-vgpu-${shaderId}`,
+            });
+          } catch {
+            // Retry with default adapter preference for mobile/tablet GPUs
+            instance = await init({
+              label: `goddev-vgpu-${shaderId}`,
+            });
+          }
+
+          if (cancelled) {
+            instance.dispose();
+            return;
+          }
+          gpu = instance;
+
+          canvasTouchedByWebgpu = true;
+          const canvasSurface = surface(instance, canvas, {
+            dpr: [1, Math.max(1, maxDpr)],
           });
+          const gpuClock = clock(instance);
 
-          const simEffect = effect(instance, fluidSimShader, {
-            label: "fluid-sim",
-            set: {
-              u: {
-                timeRes: [0, 512, 512, 0.016],
-                pointer: [0.5, 0.5, 0, 0],
-                control: [0, 1, 0.985, 0],
-              },
-              prevTex: pp.read,
-              linearSampler: lin,
-            },
-          });
+          // Compile the active shader pipeline(s)
+          if (shaderId === "fluid") {
+            const pp = pingPong(instance, 512, 512, { format: "rgba16float" });
+            const lin = sampler(instance, {
+              magFilter: "linear",
+              minFilter: "linear",
+              addressModeU: "clamp-to-edge",
+              addressModeV: "clamp-to-edge",
+            });
 
-          const dispEffect = effect(instance, fluidDisplayShader, {
-            label: "fluid-display",
-            set: {
-              u: {
-                timeRes: [
-                  0,
-                  canvasSurface.size[0],
-                  canvasSurface.size[1],
-                  canvasSurface.size[0] / Math.max(1, canvasSurface.size[1]),
-                ],
-              },
-              fluidTex: pp.read,
-              linearSampler: lin,
-            },
-          });
-
-          let simTime = 0;
-          frameLoop(
-            instance,
-            (f) => {
-              if (!isVisible || document.hidden || pausedRef.current) return;
-              const dt = reducedMotion ? 0.004 : Math.min(0.033, Math.max(0.004, gpuClock.deltaTime || 0.016));
-              simTime += dt;
-
-              const dvx = ptr.uvX - ptr.prevUvX;
-              const dvy = ptr.uvY - ptr.prevUvY;
-              ptr.prevUvX = ptr.uvX;
-              ptr.prevUvY = ptr.uvY;
-              ptr.vx = ptr.vx * 0.72 + dvx * 0.28;
-              ptr.vy = ptr.vy * 0.72 + dvy * 0.28;
-
-              simEffect.set({
+            const simEffect = effect(instance, fluidSimShader, {
+              label: "fluid-sim",
+              set: {
                 u: {
-                  timeRes: [simTime, 512, 512, dt],
-                  pointer: [ptr.uvX, ptr.uvY, ptr.vx, ptr.vy],
-                  control: [ptr.pressed ? 1 : 0, 1, 0.985, 0],
+                  timeRes: [0, 512, 512, 0.016],
+                  pointer: [0.5, 0.5, 0, 0],
+                  control: [0, 1, 0.985, 0],
                 },
                 prevTex: pp.read,
-              });
-              f.pass(pp.write, simEffect);
-              pp.swap();
+                linearSampler: lin,
+              },
+            });
 
-              const [w, h] = canvasSurface.size;
-              dispEffect.set({
-                u: { timeRes: [simTime, w, h, w / Math.max(1, h)] },
+            const dispEffect = effect(instance, fluidDisplayShader, {
+              label: "fluid-display",
+              set: {
+                u: {
+                  timeRes: [
+                    0,
+                    canvasSurface.size[0],
+                    canvasSurface.size[1],
+                    canvasSurface.size[0] / Math.max(1, canvasSurface.size[1]),
+                  ],
+                },
                 fluidTex: pp.read,
-              });
-              f.pass(canvasSurface, dispEffect);
-            },
-            { fps: 60 }
-          );
-        } else if (shaderId === "video-texture") {
-          const videoTex = texture(instance, {
-            kind: "2d",
-            size: [videoW, videoH],
-            format: "rgba8unorm",
-            usage: ["texture_binding", "copy_dst", "render_attachment"],
-            label: "live-video-texture",
-          });
-          const lin = sampler(instance, {
-            magFilter: "linear",
-            minFilter: "linear",
-            addressModeU: "clamp-to-edge",
-            addressModeV: "clamp-to-edge",
-          });
+                linearSampler: lin,
+              },
+            });
 
-          if (feedCtx && feedCanvas) {
-            drawProceduralVideoFeed(feedCtx, videoW, videoH, 0);
-            instance.gpu.queue.copyExternalImageToTexture(
-              { source: feedCanvas },
-              { texture: videoTex.gpu },
-              [videoW, videoH]
+            let simTime = 0;
+            frameLoop(
+              instance,
+              (f) => {
+                if (!isVisible || document.hidden || pausedRef.current) return;
+                const dt = reducedMotion
+                  ? 0.004
+                  : Math.min(0.033, Math.max(0.004, gpuClock.deltaTime || 0.016));
+                simTime += dt;
+
+                const dvx = ptr.uvX - ptr.prevUvX;
+                const dvy = ptr.uvY - ptr.prevUvY;
+                ptr.prevUvX = ptr.uvX;
+                ptr.prevUvY = ptr.uvY;
+                ptr.vx = ptr.vx * 0.72 + dvx * 0.28;
+                ptr.vy = ptr.vy * 0.72 + dvy * 0.28;
+
+                simEffect.set({
+                  u: {
+                    timeRes: [simTime, 512, 512, dt],
+                    pointer: [ptr.uvX, ptr.uvY, ptr.vx, ptr.vy],
+                    control: [ptr.pressed ? 1 : 0, 1, 0.985, 0],
+                  },
+                  prevTex: pp.read,
+                });
+                f.pass(pp.write, simEffect);
+                pp.swap();
+
+                const [w, h] = canvasSurface.size;
+                dispEffect.set({
+                  u: { timeRes: [simTime, w, h, w / Math.max(1, h)] },
+                  fluidTex: pp.read,
+                });
+                f.pass(canvasSurface, dispEffect);
+              },
+              { fps: 60 }
+            );
+          } else if (shaderId === "video-texture") {
+            const videoTex = texture(instance, {
+              kind: "2d",
+              size: [videoW, videoH],
+              format: "rgba8unorm",
+              usage: ["texture_binding", "copy_dst", "render_attachment"],
+              label: "live-video-texture",
+            });
+            const lin = sampler(instance, {
+              magFilter: "linear",
+              minFilter: "linear",
+              addressModeU: "clamp-to-edge",
+              addressModeV: "clamp-to-edge",
+            });
+
+            if (feedCtx && feedCanvas) {
+              drawProceduralVideoFeed(feedCtx, videoW, videoH, 0);
+              instance.gpu.queue.copyExternalImageToTexture(
+                { source: feedCanvas },
+                { texture: videoTex.gpu },
+                [videoW, videoH]
+              );
+            }
+
+            const vidEffect = effect(instance, videoTextureShader, {
+              label: "video-texture-slab",
+              set: {
+                u: {
+                  timeRes: [
+                    0,
+                    canvasSurface.size[0],
+                    canvasSurface.size[1],
+                    canvasSurface.size[0] / Math.max(1, canvasSurface.size[1]),
+                  ],
+                  pointer: [0, 0, 0, 0],
+                  control: [1, 0, 0, 0],
+                },
+                videoTex,
+                videoSampler: lin,
+              },
+            });
+
+            let elapsed = 0;
+            frameLoop(
+              instance,
+              (f) => {
+                if (!isVisible || document.hidden || pausedRef.current) return;
+                const dt = reducedMotion
+                  ? 0.004
+                  : Math.min(0.033, gpuClock.deltaTime || 0.016);
+                elapsed += dt;
+
+                ptr.orbitX += (ptr.targetOrbitX - ptr.orbitX) * 0.1;
+                ptr.orbitY += (ptr.targetOrbitY - ptr.orbitY) * 0.1;
+
+                const activeVid = videoRef.current;
+                if (activeVid && activeVid.readyState >= 2) {
+                  try {
+                    if (feedCtx && feedCanvas) {
+                      feedCtx.drawImage(activeVid, 0, 0, videoW, videoH);
+                      instance.gpu.queue.copyExternalImageToTexture(
+                        { source: feedCanvas },
+                        { texture: videoTex.gpu },
+                        [videoW, videoH]
+                      );
+                    }
+                  } catch {
+                    // Ignore transient decode frame error
+                  }
+                } else if (feedCtx && feedCanvas) {
+                  drawProceduralVideoFeed(feedCtx, videoW, videoH, elapsed);
+                  instance.gpu.queue.copyExternalImageToTexture(
+                    { source: feedCanvas },
+                    { texture: videoTex.gpu },
+                    [videoW, videoH]
+                  );
+                }
+
+                const [w, h] = canvasSurface.size;
+                vidEffect.set({
+                  u: {
+                    timeRes: [elapsed, w, h, w / Math.max(1, h)],
+                    pointer: [ptr.x, ptr.y, ptr.vx, ptr.vy],
+                    control: [1, ptr.orbitX, ptr.orbitY, ptr.pressed ? 1 : 0],
+                  },
+                });
+                f.pass(canvasSurface, vidEffect);
+              },
+              { fps: 60 }
+            );
+          } else {
+            // Single-pass fullscreen WGSL effects (cobalt-flare, radiance-cascades, particles-ocean, black-hole)
+            const shaderSource =
+              shaderId === "radiance-cascades"
+                ? radianceCascadesShader
+                : shaderId === "particles-ocean"
+                  ? particlesOceanShader
+                  : shaderId === "black-hole"
+                    ? blackHoleShader
+                    : cobaltFlareShader;
+
+            const fx = effect(instance, shaderSource, {
+              label: shaderId,
+              set: {
+                u: {
+                  timeRes: [
+                    0,
+                    canvasSurface.size[0],
+                    canvasSurface.size[1],
+                    canvasSurface.size[0] / Math.max(1, canvasSurface.size[1]),
+                  ],
+                  pointer: [0, 0, 0, 0],
+                  control: [ambient ? 1 : 0, 0, 0, 0],
+                },
+              },
+            });
+
+            let elapsed = 0;
+            frameLoop(
+              instance,
+              (f) => {
+                if (!isVisible || document.hidden || pausedRef.current) return;
+                const dt = reducedMotion
+                  ? 0.003
+                  : Math.min(0.033, gpuClock.deltaTime || 0.016);
+                elapsed += dt;
+
+                ptr.orbitX += (ptr.targetOrbitX - ptr.orbitX) * 0.1;
+                ptr.orbitY += (ptr.targetOrbitY - ptr.orbitY) * 0.1;
+
+                const [w, h] = canvasSurface.size;
+                fx.set({
+                  u: {
+                    timeRes: [elapsed, w, h, w / Math.max(1, h)],
+                    pointer: [ptr.x, ptr.y, ptr.vx, ptr.vy],
+                    control: [
+                      ambient ? 1 : 0,
+                      ptr.orbitX,
+                      ptr.orbitY,
+                      ptr.pressed ? 1 : 0,
+                    ],
+                  },
+                });
+                f.pass(canvasSurface, fx);
+              },
+              { fps: ambient ? 45 : 60 }
             );
           }
 
-          const vidEffect = effect(instance, videoTextureShader, {
-            label: "video-texture-slab",
-            set: {
-              u: {
-                timeRes: [
-                  0,
-                  canvasSurface.size[0],
-                  canvasSurface.size[1],
-                  canvasSurface.size[0] / Math.max(1, canvasSurface.size[1]),
-                ],
-                pointer: [0, 0, 0, 0],
-                control: [1, 0, 0, 0],
-              },
-              videoTex,
-              videoSampler: lin,
-            },
-          });
-
-          let elapsed = 0;
-          frameLoop(
-            instance,
-            (f) => {
-              if (!isVisible || document.hidden || pausedRef.current) return;
-              const dt = reducedMotion ? 0.004 : Math.min(0.033, gpuClock.deltaTime || 0.016);
-              elapsed += dt;
-
-              ptr.orbitX += (ptr.targetOrbitX - ptr.orbitX) * 0.1;
-              ptr.orbitY += (ptr.targetOrbitY - ptr.orbitY) * 0.1;
-
-              const activeVid = videoRef.current;
-              if (activeVid && activeVid.readyState >= 2) {
-                try {
-                  if (feedCtx && feedCanvas) {
-                    feedCtx.drawImage(activeVid, 0, 0, videoW, videoH);
-                    instance.gpu.queue.copyExternalImageToTexture(
-                      { source: feedCanvas },
-                      { texture: videoTex.gpu },
-                      [videoW, videoH]
-                    );
-                  }
-                } catch {
-                  // Ignore transient decode frame error
-                }
-              } else if (feedCtx && feedCanvas) {
-                drawProceduralVideoFeed(feedCtx, videoW, videoH, elapsed);
-                instance.gpu.queue.copyExternalImageToTexture(
-                  { source: feedCanvas },
-                  { texture: videoTex.gpu },
-                  [videoW, videoH]
-                );
-              }
-
-              const [w, h] = canvasSurface.size;
-              vidEffect.set({
-                u: {
-                  timeRes: [elapsed, w, h, w / Math.max(1, h)],
-                  pointer: [ptr.x, ptr.y, ptr.vx, ptr.vy],
-                  control: [1, ptr.orbitX, ptr.orbitY, ptr.pressed ? 1 : 0],
-                },
-              });
-              f.pass(canvasSurface, vidEffect);
-            },
-            { fps: 60 }
-          );
-        } else {
-          // Single-pass fullscreen WGSL effects (cobalt-flare, radiance-cascades, particles-ocean, black-hole)
-          const shaderSource =
-            shaderId === "radiance-cascades"
-              ? radianceCascadesShader
-              : shaderId === "particles-ocean"
-                ? particlesOceanShader
-                : shaderId === "black-hole"
-                  ? blackHoleShader
-                  : cobaltFlareShader;
-
-          const fx = effect(instance, shaderSource, {
-            label: shaderId,
-            set: {
-              u: {
-                timeRes: [
-                  0,
-                  canvasSurface.size[0],
-                  canvasSurface.size[1],
-                  canvasSurface.size[0] / Math.max(1, canvasSurface.size[1]),
-                ],
-                pointer: [0, 0, 0, 0],
-                control: [ambient ? 1 : 0, 0, 0, 0],
-              },
-            },
-          });
-
-          let elapsed = 0;
-          frameLoop(
-            instance,
-            (f) => {
-              if (!isVisible || document.hidden || pausedRef.current) return;
-              const dt = reducedMotion ? 0.003 : Math.min(0.033, gpuClock.deltaTime || 0.016);
-              elapsed += dt;
-
-              ptr.orbitX += (ptr.targetOrbitX - ptr.orbitX) * 0.1;
-              ptr.orbitY += (ptr.targetOrbitY - ptr.orbitY) * 0.1;
-
-              const [w, h] = canvasSurface.size;
-              fx.set({
-                u: {
-                  timeRes: [elapsed, w, h, w / Math.max(1, h)],
-                  pointer: [ptr.x, ptr.y, ptr.vx, ptr.vy],
-                  control: [ambient ? 1 : 0, ptr.orbitX, ptr.orbitY, ptr.pressed ? 1 : 0],
-                },
-              });
-              f.pass(canvasSurface, fx);
-            },
-            { fps: ambient ? 45 : 60 }
-          );
+          notify("webgpu");
+        } catch {
+          if (cancelled) return;
+          gpu?.dispose();
+          gpu = null;
+          if (canvasTouchedByWebgpu) {
+            // Remount a fresh <canvas> before creating a WebGL context
+            setEngineMode("webgl");
+          } else {
+            await launchWebglFallback();
+          }
         }
-
-        notify("ready");
-      } catch {
-        if (!cancelled) {
-          notify("unsupported");
-        }
-      }
-    })();
+      })();
+    }
 
     return () => {
       cancelled = true;
@@ -548,8 +620,11 @@ export function VgpuCanvas({
         canvas.removeEventListener("pointercancel", onPointerUp);
       }
       gpu?.dispose();
+      webglHandle?.dispose();
     };
-  }, [shaderId, ambient, maxDpr]);
+  }, [shaderId, ambient, maxDpr, engineMode]);
+
+  const isLive = status === "webgpu" || status === "webgl";
 
   if (status === "unsupported" && ambient) {
     return null;
@@ -564,22 +639,22 @@ export function VgpuCanvas({
       aria-hidden={ambient ? "true" : undefined}
     >
       <canvas
+        key={engineMode}
         ref={canvasRef}
         className={`block h-full w-full transition-opacity duration-500 ${
-          status === "ready" ? "opacity-100" : "opacity-0"
+          isLive ? "opacity-100" : "opacity-0"
         } ${ambient ? "pointer-events-none" : "touch-none cursor-crosshair"}`}
       />
 
       {status === "unsupported" && !ambient && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#08090D] p-6 text-center font-mono text-xs text-white/75">
           <span className="rounded border border-[#0038FF]/50 bg-[#0038FF]/15 px-2.5 py-1 text-[10px] tracking-[0.18em] text-[#6DA4FF] uppercase">
-            WEBGPU UNAVAILABLE ON THIS BROWSER
+            GPU ACCELERATION UNAVAILABLE
           </span>
           <p className="max-w-md text-[11px] leading-relaxed text-white/60">
-            WebGPU (<code>navigator.gpu</code>) is required for live{" "}
-            <code>vgpu</code> WGSL shaders. Switch back to{" "}
-            <strong className="text-white">3D LIDAR · WEBGL</strong> above or
-            open on Chrome / Edge / Safari 26+ with hardware GPU enabled.
+            Neither WebGPU nor WebGL hardware acceleration is enabled in this
+            browser session. Enable hardware acceleration or switch to{" "}
+            <strong className="text-white">3D LIDAR · WEBGL</strong> above.
           </p>
         </div>
       )}

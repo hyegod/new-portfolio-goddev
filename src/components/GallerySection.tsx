@@ -327,6 +327,7 @@ export function GallerySection({
   const [activeVgpuShader, setActiveVgpuShader] =
     useState<VgpuShaderId>("cobalt-flare");
   const [vgpuStatus, setVgpuStatus] = useState<VgpuStatus>("loading");
+  const [forceWebglEngine, setForceWebglEngine] = useState<boolean>(false);
   const [customVideoName, setCustomVideoName] = useState<string | null>(null);
 
   // Lightweight specimen metadata renders rail thumbnails immediately with zero 3D CPU cost at startup
@@ -379,6 +380,11 @@ export function GallerySection({
     const modeParam = params.get("mode");
     const shaderParam = params.get("shader");
     const presetParam = params.get("preset");
+    const engineParam = params.get("engine");
+
+    if (engineParam === "webgl") {
+      setForceWebglEngine(true);
+    }
 
     if (shaderParam) {
       const matched = VGPU_LAB_PRESETS.find((p) => p.id === shaderParam);
@@ -1167,16 +1173,17 @@ export function GallerySection({
         </>
         ) : (
         <>
-        {/* Live vgpu WebGPU Canvas */}
+        {/* Live vgpu WebGPU Canvas (auto-falls back to WebGL2 on phones/tablets without WebGPU) */}
         <div className="absolute inset-0">
           {isNearStage && perf && (
             <LazyVgpuCanvas
               shaderId={activeVgpuShader}
               paused={paused}
               maxDpr={Math.min(1.75, perf.maxDpr)}
+              forceWebgl={forceWebglEngine}
               videoElement={customVideoName ? videoElRef.current : null}
               onStatusChange={setVgpuStatus}
-              ariaLabel={`Interactive vgpu WebGPU shader displaying ${activeVgpuPreset.label}`}
+              ariaLabel={`Interactive vgpu shader displaying ${activeVgpuPreset.label}`}
             />
           )}
         </div>
@@ -1201,28 +1208,39 @@ export function GallerySection({
                 {activeVgpuPreset.tag}
               </span>
               <span
+                title={
+                  vgpuStatus === "webgl"
+                    ? "WebGPU unavailable on this browser — running automatic WebGL2 mobile/tablet compatibility shader"
+                    : undefined
+                }
                 className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[8.5px] tracking-[0.14em] uppercase ${
-                  vgpuStatus === "ready"
+                  vgpuStatus === "webgpu"
                     ? "border-[#5B86FF]/45 bg-[#0038FF]/20 text-[#9CC2FF]"
-                    : vgpuStatus === "unsupported"
-                      ? "border-amber-400/40 bg-amber-500/15 text-amber-200"
-                      : "border-white/20 bg-white/10 text-white/70"
+                    : vgpuStatus === "webgl"
+                      ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                      : vgpuStatus === "unsupported"
+                        ? "border-amber-400/40 bg-amber-500/15 text-amber-200"
+                        : "border-white/20 bg-white/10 text-white/70"
                 }`}
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    vgpuStatus === "ready"
+                    vgpuStatus === "webgpu"
                       ? "bg-[#5B86FF]"
-                      : vgpuStatus === "unsupported"
-                        ? "bg-amber-300"
-                        : "bg-white/60"
+                      : vgpuStatus === "webgl"
+                        ? "bg-emerald-300"
+                        : vgpuStatus === "unsupported"
+                          ? "bg-amber-300"
+                          : "bg-white/60"
                   }`}
                 />
-                {vgpuStatus === "ready"
+                {vgpuStatus === "webgpu"
                   ? "WEBGPU LIVE"
-                  : vgpuStatus === "unsupported"
-                    ? "FALLBACK"
-                    : "COMPILING WGSL"}
+                  : vgpuStatus === "webgl"
+                    ? "WEBGL2 COMPAT"
+                    : vgpuStatus === "unsupported"
+                      ? "UNAVAILABLE"
+                      : "COMPILING"}
               </span>
             </div>
             <p className="break-words font-mono text-[9px] tracking-[0.12em] text-white/65 uppercase sm:text-[10px] sm:tracking-[0.16em]">

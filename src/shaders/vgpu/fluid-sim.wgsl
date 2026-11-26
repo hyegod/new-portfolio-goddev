@@ -62,39 +62,39 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   var state = mix(advected, blur, 0.08);
 
   // Viscous velocity damping & dye fade
-  state.r *= 0.985;
-  state.g *= 0.985;
-  state.b *= 0.988; // Electric Cobalt dye channel
-  state.a *= 0.984; // Cyan/Bone highlight dye channel
+  state.r *= 0.972;
+  state.g *= 0.972;
+  state.b *= 0.974; // Electric Cobalt dye channel
+  state.a *= 0.964; // Cyan/Bone highlight dye channel
 
-  // Autonomous twin emitter jets so canvas stays alive even before stirring
-  let jet1 = vec2f(0.5 + cos(t * 0.72) * 0.26, 0.5 + sin(t * 0.95) * 0.22);
-  let jet2 = vec2f(0.5 + cos(t * 0.58 + 3.14) * 0.28, 0.5 + sin(t * 0.81 + 1.57) * 0.24);
+  // Autonomous twin emitter jets (dt-scaled so dye forms silky ribbons without saturating)
+  let jet1 = vec2f(0.5 + cos(t * 0.78) * 0.26, 0.5 + sin(t * 1.02) * 0.22);
+  let jet2 = vec2f(0.5 + cos(t * 0.62 + 3.14) * 0.28, 0.5 + sin(t * 0.86 + 1.57) * 0.24);
   let j1d = length((uv - jet1) * vec2f(aspect, 1.0));
   let j2d = length((uv - jet2) * vec2f(aspect, 1.0));
-  let j1Spl = exp(-j1d * j1d * 240.0);
-  let j2Spl = exp(-j2d * j2d * 240.0);
+  let j1Spl = exp(-j1d * j1d * 340.0);
+  let j2Spl = exp(-j2d * j2d * 340.0);
 
-  let j1Dir = vec2f(-sin(t * 0.72), cos(t * 0.95)) * 0.42;
-  let j2Dir = vec2f(-sin(t * 0.58 + 3.14), cos(t * 0.81 + 1.57)) * 0.42;
+  let j1Dir = vec2f(-sin(t * 0.78), cos(t * 1.02)) * 0.55;
+  let j2Dir = vec2f(-sin(t * 0.62 + 3.14), cos(t * 0.86 + 1.57)) * 0.55;
 
-  state.r += (j1Dir.x * j1Spl + j2Dir.x * j2Spl) * dt * 8.0;
-  state.g += (j1Dir.y * j1Spl + j2Dir.y * j2Spl) * dt * 8.0;
-  state.b = clamp(state.b + (j1Spl * 0.48 + j2Spl * 0.22), 0.0, 2.5);
-  state.a = clamp(state.a + (j2Spl * 0.42 + j1Spl * 0.14), 0.0, 2.5);
+  state.r += (j1Dir.x * j1Spl + j2Dir.x * j2Spl) * dt * 6.5;
+  state.g += (j1Dir.y * j1Spl + j2Dir.y * j2Spl) * dt * 6.5;
+  state.b = clamp(state.b + (j1Spl * 0.92 + j2Spl * 0.36) * dt * 7.5, 0.0, 2.2);
+  state.a = clamp(state.a + (j2Spl * 0.72 + j1Spl * 0.24) * dt * 6.5, 0.0, 2.0);
 
   // Interactive pointer / touch fluid splat & impulse
   let pSpeed = length(u.pointer.zw);
-  let stirFactor = max(u.control.x, smoothstep(0.0005, 0.008, pSpeed));
+  let stirFactor = max(u.control.x * 0.85, smoothstep(0.0005, 0.008, pSpeed));
   if (stirFactor > 0.01) {
     let pPos = u.pointer.xy;
     let dVec = (uv - pPos) * vec2f(aspect, 1.0);
-    let splat = exp(-dot(dVec, dVec) * 165.0) * stirFactor;
-    let impulse = clamp(u.pointer.zw * 22.0, vec2f(-1.8), vec2f(1.8));
+    let splat = exp(-dot(dVec, dVec) * 260.0) * stirFactor;
+    let impulse = clamp(u.pointer.zw * 22.0, vec2f(-1.5), vec2f(1.5));
     state.r += impulse.x * splat;
     state.g += impulse.y * splat;
-    state.b = clamp(state.b + splat * (0.85 + pSpeed * 12.0), 0.0, 3.0);
-    state.a = clamp(state.a + splat * (0.65 + u.control.x * 0.45), 0.0, 3.0);
+    state.b = clamp(state.b + splat * (1.1 + pSpeed * 12.0) * dt * 9.0, 0.0, 2.5);
+    state.a = clamp(state.a + splat * (0.8 + u.control.x * 0.45) * dt * 7.5, 0.0, 2.2);
   }
 
   return vec4f(clamp(state.rg, vec2f(-2.5), vec2f(2.5)), state.ba);
