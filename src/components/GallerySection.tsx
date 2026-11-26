@@ -5,11 +5,14 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Cpu,
+  Film,
   Maximize2,
   Minimize2,
   Pause,
   Play,
   Plus,
+  RotateCcw,
   Sparkles,
   Upload,
   X,
@@ -34,8 +37,65 @@ import type {
   WhitePaperMode,
 } from "./GatherPointCloud";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
+import { LazyVgpuCanvas } from "./LazyVgpuCanvas";
+import type { VgpuShaderId, VgpuStatus } from "./VgpuCanvas";
 
 const BUILTIN_PRESETS: PointPresetId[] = ["bridge", "tower", "terrain", "shell"];
+
+type StudioMode = "lidar" | "webgpu";
+
+interface VgpuLabPreset {
+  id: VgpuShaderId;
+  num: string;
+  label: string;
+  tag: string;
+  hint: string;
+}
+
+const VGPU_LAB_PRESETS: VgpuLabPreset[] = [
+  {
+    id: "cobalt-flare",
+    num: "01",
+    label: "COBALT FLARE",
+    tag: "TRIANGLE LED · NEXT.JS FLARE",
+    hint: "MOVE POINTER TO GUIDE VOLUMETRIC COBALT FLARE",
+  },
+  {
+    id: "fluid",
+    num: "02",
+    label: "INTERACTIVE FLUID",
+    tag: "PING-PONG NAVIER-CURL SOLVER",
+    hint: "SWIPE OR DRAG CANVAS TO STIR COBALT FLUID",
+  },
+  {
+    id: "radiance-cascades",
+    num: "03",
+    label: "RADIANCE CASCADES",
+    tag: "2D GLOBAL ILLUMINATION",
+    hint: "MOVE POINTER TO CAST ARCHITECTURAL GI SHADOWS",
+  },
+  {
+    id: "particles-ocean",
+    num: "04",
+    label: "PARTICLES OCEAN",
+    tag: "GERSTNER WAVE FIELD",
+    hint: "DRAG TO ORBIT DEEP-WATER PARTICLE HORIZON",
+  },
+  {
+    id: "black-hole",
+    num: "05",
+    label: "BLACK HOLE",
+    tag: "OPTIMIZED RELATIVISTIC LENSING",
+    hint: "DRAG TO ORBIT ACCRETION DISK & PHOTON RING",
+  },
+  {
+    id: "video-texture",
+    num: "06",
+    label: "VIDEO TO TEXTURE",
+    tag: "LIVE VIDEO → 3D GLASS SLAB",
+    hint: "DRAG SLAB OR DROP / UPLOAD .MP4/.WEBM VIDEO",
+  },
+];
 
 type PlateFilter = "ALL" | GalleryPlate["filterGroup"];
 
@@ -252,6 +312,9 @@ export function GallerySection({
   const sectionRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const videoElRef = useRef<HTMLVideoElement>(null);
+  const customVideoUrlRef = useRef<string | null>(null);
   const lightboxRef = useRef<HTMLDialogElement>(null);
   const cloudCacheRef = useRef<Map<string, PointCloudData>>(new Map());
 
@@ -259,6 +322,12 @@ export function GallerySection({
   const nearStageViewport = useNearViewport(stageRef, "650px 0px");
   const isNearStage = standalone || nearStageViewport;
   const labPoints = perf?.galleryPoints ?? 36000;
+
+  const [studioMode, setStudioMode] = useState<StudioMode>("lidar");
+  const [activeVgpuShader, setActiveVgpuShader] =
+    useState<VgpuShaderId>("cobalt-flare");
+  const [vgpuStatus, setVgpuStatus] = useState<VgpuStatus>("loading");
+  const [customVideoName, setCustomVideoName] = useState<string | null>(null);
 
   // Lightweight specimen metadata renders rail thumbnails immediately with zero 3D CPU cost at startup
   const [specimens, setSpecimens] = useState<SpecimenEntry[]>(() =>
@@ -294,26 +363,58 @@ export function GallerySection({
   });
 
   const activeEntry = specimens[activeIndex] ?? specimens[0];
+  const activeVgpuPreset =
+    VGPU_LAB_PRESETS.find((preset) => preset.id === activeVgpuShader) ??
+    VGPU_LAB_PRESETS[0];
 
   const visiblePlates = useMemo(() => {
     if (!standalone || activePlateFilter === "ALL") return plateList;
     return plateList.filter((p) => p.filterGroup === activePlateFilter);
   }, [standalone, activePlateFilter, plateList]);
 
-  // Support deep-linking from /works/[slug] via /gallery?preset=bridge|tower|terrain|shell
+  // Support deep-linking from /works/[slug] via /gallery?preset=... or ?mode=webgpu&shader=...
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const presetParam = new URLSearchParams(window.location.search).get("preset");
-    if (!presetParam) return;
-    const idx = BUILTIN_PRESETS.indexOf(presetParam as PointPresetId);
-    if (idx >= 0) {
-      setActiveIndex(idx);
+    const params = new URLSearchParams(window.location.search);
+    const modeParam = params.get("mode");
+    const shaderParam = params.get("shader");
+    const presetParam = params.get("preset");
+
+    if (shaderParam) {
+      const matched = VGPU_LAB_PRESETS.find((p) => p.id === shaderParam);
+      if (matched) {
+        setActiveVgpuShader(matched.id);
+        setStudioMode("webgpu");
+        return;
+      }
     }
+
+    if (modeParam === "webgpu") {
+      setStudioMode("webgpu");
+      return;
+    }
+
+    if (presetParam) {
+      const idx = BUILTIN_PRESETS.indexOf(presetParam as PointPresetId);
+      if (idx >= 0) {
+        setActiveIndex(idx);
+        setStudioMode("lidar");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (customVideoUrlRef.current) {
+        URL.revokeObjectURL(customVideoUrlRef.current);
+        customVideoUrlRef.current = null;
+      }
+    };
   }, []);
 
   // Generate 3D points lazily on demand once #gallery approaches viewport, cached per preset
   const activeCloud = useMemo(() => {
-    if (!isNearStage || !perf) return null;
+    if (!isNearStage || !perf || studioMode !== "lidar") return null;
     if (activeEntry.customCloud) return activeEntry.customCloud;
     const preset = activeEntry.preset ?? "bridge";
     const key = `${preset}-${perf.galleryPoints}`;
@@ -322,15 +423,64 @@ export function GallerySection({
     const generated = generatePresetPointCloud(preset, perf.galleryPoints);
     cloudCacheRef.current.set(key, generated);
     return generated;
-  }, [activeEntry, isNearStage, perf]);
+  }, [activeEntry, isNearStage, perf, studioMode]);
 
   const handleNext = useCallback(() => {
+    if (studioMode === "webgpu") {
+      setActiveVgpuShader((prev) => {
+        const idx = VGPU_LAB_PRESETS.findIndex((p) => p.id === prev);
+        return VGPU_LAB_PRESETS[(idx + 1) % VGPU_LAB_PRESETS.length].id;
+      });
+      return;
+    }
     setActiveIndex((prev) => (prev + 1) % specimens.length);
-  }, [specimens.length]);
+  }, [specimens.length, studioMode]);
+
+  const handleVideoFile = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const videoFile = Array.from(files).find((f) => f.type.startsWith("video/"));
+    if (!videoFile) return;
+
+    if (customVideoUrlRef.current) {
+      URL.revokeObjectURL(customVideoUrlRef.current);
+    }
+    const blobUrl = URL.createObjectURL(videoFile);
+    customVideoUrlRef.current = blobUrl;
+
+    const videoEl = videoElRef.current;
+    if (videoEl) {
+      videoEl.src = blobUrl;
+      videoEl.currentTime = 0;
+      void videoEl.play().catch(() => {});
+    }
+
+    const cleanName = videoFile.name
+      .replace(/\.[^/.]+$/, "")
+      .toUpperCase()
+      .slice(0, 26);
+    setCustomVideoName(cleanName || "LOCAL VIDEO");
+    setActiveVgpuShader("video-texture");
+    setStudioMode("webgpu");
+  }, []);
+
+  const clearCustomVideo = useCallback(() => {
+    if (customVideoUrlRef.current) {
+      URL.revokeObjectURL(customVideoUrlRef.current);
+      customVideoUrlRef.current = null;
+    }
+    const videoEl = videoElRef.current;
+    if (videoEl) {
+      videoEl.pause();
+      videoEl.removeAttribute("src");
+      videoEl.load();
+    }
+    setCustomVideoName(null);
+  }, []);
 
   const loadPresetIntoViewer = (preset: PointPresetId) => {
     const idx = BUILTIN_PRESETS.indexOf(preset);
     if (idx >= 0) {
+      setStudioMode("lidar");
       setActiveIndex(idx);
       lightboxRef.current?.close();
       stageRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -557,8 +707,84 @@ export function GallerySection({
         </div>
       </div>
 
-      {/* PART A: Full Gather 3D Point-Cloud Structural Viewer (deferred-lab kept directly on WebGL stage) */}
+      {/* PART A: Switchable 3D LiDAR (WebGL2) & WebGPU Shader Lab (vgpu) */}
       <div className="anim-stage-reveal mx-auto max-w-[1440px] min-w-0">
+        {/* Studio Mode Switcher Bar */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5 sm:mb-4">
+          <div
+            role="tablist"
+            aria-label="Interactive canvas engine"
+            className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-xl border border-black/12 bg-white/80 p-1 shadow-[0_8px_20px_-12px_rgba(13,14,18,0.14)] backdrop-blur-md"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={studioMode === "lidar"}
+              onClick={() => setStudioMode("lidar")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.14em] uppercase transition-colors sm:px-3.5 sm:text-[10px] sm:tracking-[0.16em] ${
+                studioMode === "lidar"
+                  ? "bg-[#0D0E12] text-white shadow-xs"
+                  : "text-[#505562] hover:text-[#0D0E12]"
+              }`}
+            >
+              <Sparkles className="h-3 w-3 shrink-0" />
+              <span className="text-trim">3D LIDAR · WEBGL</span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={studioMode === "webgpu"}
+              onClick={() => setStudioMode("webgpu")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.14em] uppercase transition-colors sm:px-3.5 sm:text-[10px] sm:tracking-[0.16em] ${
+                studioMode === "webgpu"
+                  ? "bg-[#0038FF] text-white shadow-xs"
+                  : "text-[#505562] hover:text-[#0038FF]"
+              }`}
+            >
+              <Cpu className="h-3 w-3 shrink-0" />
+              <span className="text-trim">WEBGPU LAB · VGPU</span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[8.5px] leading-none tracking-[0.12em] ${
+                  studioMode === "webgpu"
+                    ? "bg-white/20 text-white"
+                    : "bg-[#0038FF]/12 text-[#0038FF]"
+                }`}
+              >
+                06
+              </span>
+            </button>
+          </div>
+
+          <p className="font-mono text-[9.5px] tracking-[0.14em] text-[#505562] uppercase sm:text-[10px] sm:tracking-[0.18em]">
+            {studioMode === "lidar"
+              ? "THREE.JS WEBGL2 · 04 POINT-CLOUD SPECIMENS"
+              : "VERCEL LABS VGPU · 06 WGSL SHADERS"}
+          </p>
+        </div>
+
+        {/* Hidden local video source & file input for WebGPU Video-to-Texture mode */}
+        <video
+          ref={videoElRef}
+          loop
+          muted
+          playsInline
+          autoPlay
+          crossOrigin="anonymous"
+          className="hidden"
+          aria-hidden="true"
+        />
+        <input
+          ref={videoFileInputRef}
+          type="file"
+          accept="video/*"
+          className="sr-only"
+          onChange={(e) => {
+            handleVideoFile(e.target.files);
+            e.target.value = "";
+          }}
+        />
+
         <div
           ref={stageRef}
           onDragOver={(e) => {
@@ -569,14 +795,20 @@ export function GallerySection({
           onDrop={(e) => {
             e.preventDefault();
             setIsDragOver(false);
-            void handleFiles(e.dataTransfer.files);
+            if (studioMode === "webgpu") {
+              handleVideoFile(e.dataTransfer.files);
+            } else {
+              void handleFiles(e.dataTransfer.files);
+            }
           }}
           className={`deferred-lab relative flex min-h-[600px] w-full min-w-0 flex-col justify-between overflow-hidden rounded-2xl border transition-colors duration-300 sm:min-h-[680px] lg:min-h-[740px] ${
-            paperLight
+            studioMode === "lidar" && paperLight
               ? "gather-surface-light border-black/20 shadow-[0_24px_56px_-18px_rgba(13,14,18,0.18)]"
               : "gather-surface-dark border-black/25 shadow-[0_28px_64px_-18px_rgba(6,8,16,0.45)]"
           }`}
         >
+        {studioMode === "lidar" ? (
+        <>
         <div className="absolute inset-0">
           {activeCloud && perf && (
             <LazyGatherPointCloud
@@ -932,6 +1164,172 @@ export function GallerySection({
             </div>
           </div>
         </div>
+        </>
+        ) : (
+        <>
+        {/* Live vgpu WebGPU Canvas */}
+        <div className="absolute inset-0">
+          {isNearStage && perf && (
+            <LazyVgpuCanvas
+              shaderId={activeVgpuShader}
+              paused={paused}
+              maxDpr={Math.min(1.75, perf.maxDpr)}
+              videoElement={customVideoName ? videoElRef.current : null}
+              onStatusChange={setVgpuStatus}
+              ariaLabel={`Interactive vgpu WebGPU shader displaying ${activeVgpuPreset.label}`}
+            />
+          )}
+        </div>
+
+        {isDragOver && (
+          <div className="pointer-events-none absolute inset-3 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-[#0038FF] bg-black/65 p-4 text-center backdrop-blur-xs">
+            <div className="flex flex-wrap items-center justify-center gap-2 font-mono text-[10px] tracking-[0.18em] text-white uppercase sm:gap-3 sm:text-xs sm:tracking-[0.22em]">
+              <Film className="h-4 w-4 shrink-0 text-[#3c6bff]" />
+              <span>DROP .MP4 OR .WEBM VIDEO TO STREAM ONTO WEBGPU GLASS SLAB</span>
+            </div>
+          </div>
+        )}
+
+        {/* Top Floating Smoked Glass HUD Bar for WebGPU Lab */}
+        <div className="pointer-events-none relative z-20 flex min-w-0 flex-col gap-2.5 p-2.5 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+          <div className="glass-obsidian pointer-events-auto min-w-0 max-w-full space-y-1 rounded-xl px-3 py-2.5 text-white sm:px-4 sm:py-3">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:gap-x-3">
+              <span className="font-mono text-xs font-semibold tracking-[0.26em] text-white uppercase sm:text-sm sm:tracking-[0.34em]">
+                VGPU
+              </span>
+              <span className="font-mono text-[9px] tracking-[0.16em] text-white/55 uppercase sm:text-[10px] sm:tracking-[0.2em]">
+                {activeVgpuPreset.tag}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[8.5px] tracking-[0.14em] uppercase ${
+                  vgpuStatus === "ready"
+                    ? "border-[#5B86FF]/45 bg-[#0038FF]/20 text-[#9CC2FF]"
+                    : vgpuStatus === "unsupported"
+                      ? "border-amber-400/40 bg-amber-500/15 text-amber-200"
+                      : "border-white/20 bg-white/10 text-white/70"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    vgpuStatus === "ready"
+                      ? "bg-[#5B86FF]"
+                      : vgpuStatus === "unsupported"
+                        ? "bg-amber-300"
+                        : "bg-white/60"
+                  }`}
+                />
+                {vgpuStatus === "ready"
+                  ? "WEBGPU LIVE"
+                  : vgpuStatus === "unsupported"
+                    ? "FALLBACK"
+                    : "COMPILING WGSL"}
+              </span>
+            </div>
+            <p className="break-words font-mono text-[9px] tracking-[0.12em] text-white/65 uppercase sm:text-[10px] sm:tracking-[0.16em]">
+              {activeVgpuPreset.hint}
+            </p>
+          </div>
+
+          <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-1.5 self-end sm:gap-2 sm:self-auto">
+            <button
+              type="button"
+              onClick={handleNext}
+              className="glass-pill-dark inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-[9.5px] tracking-[0.14em] text-white uppercase transition-colors hover:border-[#0038FF] sm:px-3 sm:text-[10px] sm:tracking-[0.16em]"
+              aria-label="Cycle to next WebGPU shader"
+            >
+              <span className="text-trim">NEXT</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPaused((p) => !p)}
+              className="glass-pill-dark inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-[9.5px] tracking-[0.14em] text-white uppercase transition-colors hover:border-[#0038FF] sm:px-3 sm:text-[10px] sm:tracking-[0.16em]"
+              aria-label={paused ? "Resume WebGPU shader" : "Pause WebGPU shader"}
+            >
+              {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+              <span className="text-trim">{paused ? "PLAY" : "PAUSE"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void toggleFullscreen()}
+              className="glass-pill-dark grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white transition-colors hover:border-[#0038FF]"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom Floating Smoked Glass 6-Shader Selector Dock */}
+        <div className="glass-obsidian relative z-20 m-2.5 min-w-0 space-y-2.5 rounded-xl p-2.5 text-white sm:m-4 sm:space-y-3 sm:p-4">
+          {activeVgpuShader === "video-texture" && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/12 pb-2.5 font-mono text-[9.5px] tracking-[0.14em] uppercase sm:text-[10px]">
+              <span className="min-w-0 truncate text-white/75">
+                SOURCE:{" "}
+                <strong className="text-[#8AB4FF]">
+                  {customVideoName ?? "LIVE PROCEDURAL TELEMETRY FEED"}
+                </strong>
+              </span>
+              <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => videoFileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#0038FF] bg-[#0038FF] px-2.5 py-1 text-[9.5px] font-semibold tracking-[0.14em] text-white transition-colors hover:bg-[#1a4dff]"
+                >
+                  <Film className="h-3 w-3 shrink-0" />
+                  <span>LOAD VIDEO</span>
+                </button>
+                {customVideoName && (
+                  <button
+                    type="button"
+                    onClick={clearCustomVideo}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/8 px-2.5 py-1 text-[9.5px] text-white/80 transition-colors hover:border-white/45 hover:text-white"
+                  >
+                    <RotateCcw className="h-3 w-3 shrink-0" />
+                    <span>RESET FEED</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3 sm:gap-2 lg:grid-cols-6">
+            {VGPU_LAB_PRESETS.map((preset) => {
+              const selected = preset.id === activeVgpuShader;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setActiveVgpuShader(preset.id)}
+                  aria-pressed={selected}
+                  className={`group flex min-w-0 flex-col items-start gap-1 rounded-lg border px-2.5 py-2 text-left transition-all sm:px-3 sm:py-2.5 ${
+                    selected
+                      ? "border-[#4E7CFF] bg-[#0038FF]/28 text-white shadow-[0_0_24px_-8px_rgba(0,56,255,0.85)]"
+                      : "border-white/12 bg-white/[0.03] text-white/65 hover:border-white/30 hover:bg-white/[0.08] hover:text-white"
+                  }`}
+                >
+                  <span
+                    className={`font-mono text-[8.5px] tracking-[0.18em] ${
+                      selected ? "text-[#8AB4FF]" : "text-white/40 group-hover:text-white/70"
+                    }`}
+                  >
+                    {preset.num} // WGSL
+                  </span>
+                  <span className="w-full truncate font-mono text-[9.5px] font-semibold tracking-[0.12em] uppercase sm:text-[10px]">
+                    {preset.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        </>
+        )}
         </div>
       </div>
 
@@ -1056,7 +1454,7 @@ export function GallerySection({
             >
               <div className="min-w-0">
                 <p className="font-mono text-[9.5px] tracking-[0.18em] text-[#0038FF] uppercase sm:text-[10px]">
-                  ARCHIVE // FULL 3D LIDAR STUDIO &amp; FILTERABLE BLUEPRINT ARCHIVE
+                  ARCHIVE // FULL 3D LIDAR · WEBGPU LAB &amp; FILTERABLE BLUEPRINT ARCHIVE
                 </p>
                 <p className="mt-1 font-display text-sm font-extrabold tracking-tight text-[#0D0E12] uppercase transition-colors group-hover:text-[#0038FF] sm:text-base">
                   VIEW OTHER GALLERY &amp; ALL TECHNICAL PLATES

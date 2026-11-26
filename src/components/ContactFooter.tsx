@@ -4,11 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ArrowUpRight, Check, Copy, X } from "lucide-react";
 import { motion } from "motion/react";
 import { PORTFOLIO_PROFILE } from "@/data/portfolio";
+import { useNearViewport, usePerformanceProfile } from "@/lib/devicePerf";
+import { LazyVgpuCanvas } from "./LazyVgpuCanvas";
 
 export function ContactFooter() {
   const [copied, setCopied] = useState(false);
   const [localClock, setLocalClock] = useState("LOCAL");
+  const footerRef = useRef<HTMLElement>(null);
   const creditsDialogRef = useRef<HTMLDialogElement>(null);
+  const perf = usePerformanceProfile();
+  const isNearFooter = useNearViewport(footerRef, "350px 0px");
 
   useEffect(() => {
     const updateClock = () => {
@@ -76,9 +81,24 @@ export function ContactFooter() {
 
   return (
     <footer
+      ref={footerRef}
       id="contact"
       className="relative overflow-hidden bg-[#08090D] px-3 pt-16 pb-10 text-[#F2F4F7] min-[380px]:px-4 sm:px-8 sm:pt-24 lg:px-12 lg:pt-28"
     >
+      {/* Subtle Ambient WebGPU Triangle-LED + Electric Cobalt Flare (vgpu · lazy-mounted, zero-error fallback) */}
+      {isNearFooter && perf && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-0 opacity-65"
+        >
+          <LazyVgpuCanvas
+            shaderId="cobalt-flare"
+            ambient
+            maxDpr={Math.min(1.5, perf.maxDpr)}
+          />
+        </div>
+      )}
+
       {/* Pure Electric Cobalt Ambient Halo behind Smoked Glass Contact Panel */}
       <div
         aria-hidden="true"
