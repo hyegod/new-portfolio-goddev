@@ -311,6 +311,8 @@ export interface StepContext {
   /** Body displacement the crowd asks for this step, x/z (see colony resolveCrowding). */
   readonly pushX?: number;
   readonly pushZ?: number;
+  /** Allow walking outside the [-HALF, HALF] sculptable tile (used by free-roaming page bots). */
+  readonly unbounded?: boolean;
 }
 
 const local: Vec3 = [0, 0, 0];
@@ -335,8 +337,9 @@ export function stepRobot(robot: Robot, context: StepContext): void {
   // it as its planted feet can follow (see supportFraction).
   const walkX = robot.position[0] + Math.sin(heading0 + turn) * speed * dt + (context.pushX ?? 0);
   const walkZ = robot.position[2] + Math.cos(heading0 + turn) * speed * dt + (context.pushZ ?? 0);
-  const moveX = clampToTile(walkX, EDGE_MARGIN) - robot.position[0];
-  const moveZ = clampToTile(walkZ, EDGE_MARGIN) - robot.position[2];
+  const unbounded = Boolean(context.unbounded);
+  const moveX = (unbounded ? walkX : clampToTile(walkX, EDGE_MARGIN)) - robot.position[0];
+  const moveZ = (unbounded ? walkZ : clampToTile(walkZ, EDGE_MARGIN)) - robot.position[2];
   const fraction = supportFraction(robot, turn, moveX, moveZ);
   if (fraction < 1) {
     robot.held++;
@@ -365,7 +368,7 @@ export function stepRobot(robot: Robot, context: StepContext): void {
       foot.position[1] = heightAt(terrain, foot.position[0], foot.position[2]) + FOOT_RADIUS;
       continue;
     }
-    predictFoothold(foot.landing, robot, leg, yawRate, lead * (1 - foot.swing), terrain);
+    predictFoothold(foot.landing, robot, leg, yawRate, lead * (1 - foot.swing), terrain, unbounded);
     foot.swing = Math.min(1, foot.swing + dt / SWING_TIME);
     swingPosition(foot, terrain);
     if (foot.swing >= 1) {
@@ -398,7 +401,7 @@ export function stepRobot(robot: Robot, context: StepContext): void {
         foot.planted = false;
         foot.swing = 0;
         vec3.copy(foot.start, foot.position);
-        predictFoothold(foot.landing, robot, leg, yawRate, lead, terrain);
+        predictFoothold(foot.landing, robot, leg, yawRate, lead, terrain, unbounded);
       }
       robot.turn = 1 - robot.turn;
     }
@@ -511,11 +514,13 @@ function terrainMoved(foot: Foot, terrain: Terrain): boolean {
 }
 
 /** Where a foot should land: the rest foothold under the body pose `lead` seconds ahead. */
-function predictFoothold(out: Vec3, robot: Robot, leg: number, yawRate: number, lead: number, terrain: Terrain): Vec3 {
+function predictFoothold(out: Vec3, robot: Robot, leg: number, yawRate: number, lead: number, terrain: Terrain, unbounded = false): Vec3 {
   const yaw = clamp(yawRate * lead, -PREDICT_TURN, PREDICT_TURN);
   poseFoothold(out, robot, leg, yaw, robot.position[0] + robot.velocity[0] * lead, robot.position[2] + robot.velocity[1] * lead);
-  out[0] = clampToTile(out[0], FOOT_EDGE);
-  out[2] = clampToTile(out[2], FOOT_EDGE);
+  if (!unbounded) {
+    out[0] = clampToTile(out[0], FOOT_EDGE);
+    out[2] = clampToTile(out[2], FOOT_EDGE);
+  }
   out[1] = heightAt(terrain, out[0], out[2]) + FOOT_RADIUS;
   return out;
 }

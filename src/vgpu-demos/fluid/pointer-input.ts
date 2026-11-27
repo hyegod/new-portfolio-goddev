@@ -24,12 +24,17 @@ export function installStirInput(
 
   const point = (event: PointerEvent): [number, number] => {
     const r = canvas.getBoundingClientRect();
+    const w = Math.max(1, r.width);
+    const h = Math.max(1, r.height);
+    const sx = Math.max(0, Math.min(1, (event.clientX - r.left) / w));
+    const sy = Math.max(0, Math.min(1, 1 - (event.clientY - r.top) / h));
+    // Match display.wgsl cover projection onto the 1:1 square fluid grid
+    const viewAspect = w / h;
+    const scaleX = viewAspect < 1 ? viewAspect : 1;
+    const scaleY = viewAspect > 1 ? 1 / viewAspect : 1;
     return [
-      Math.max(0, Math.min(1, (event.clientX - r.left) / Math.max(1, r.width))),
-      Math.max(
-        0,
-        Math.min(1, 1 - (event.clientY - r.top) / Math.max(1, r.height))
-      ),
+      0.5 + (sx - 0.5) * scaleX,
+      0.5 + (sy - 0.5) * scaleY,
     ];
   };
 

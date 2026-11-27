@@ -231,13 +231,15 @@ void main() {
   float dyeB = state.b * 0.972;
   float dyeA = state.a * 0.962;
 
-  // Autonomous twin orbital emitter jets (dt-scaled so dye forms silky ribbons, never saturating)
-  vec2 jet1 = vec2(0.5 + cos(t * 0.78) * 0.26, 0.5 + sin(t * 1.02) * 0.22);
-  vec2 jet2 = vec2(0.5 + cos(t * 0.62 + 3.14) * 0.28, 0.5 + sin(t * 0.86 + 1.57) * 0.24);
+  // Autonomous twin orbital emitter jets constrained to visible cover slice (uControl.y = visX, uControl.z = visY)
+  float visX = max(0.25, uControl.y);
+  float visY = max(0.25, uControl.z);
+  vec2 jet1 = vec2(0.5 + cos(t * 0.78) * 0.26 * visX, 0.5 + sin(t * 1.02) * 0.22 * visY);
+  vec2 jet2 = vec2(0.5 + cos(t * 0.62 + 3.14) * 0.28 * visX, 0.5 + sin(t * 0.86 + 1.57) * 0.24 * visY);
   float j1d = length((vFboUv - jet1) * vec2(aspect, 1.0));
   float j2d = length((vFboUv - jet2) * vec2(aspect, 1.0));
-  float j1Spl = exp(-j1d * j1d * 340.0);
-  float j2Spl = exp(-j2d * j2d * 340.0);
+  float j1Spl = exp(-j1d * j1d * 420.0);
+  float j2Spl = exp(-j2d * j2d * 420.0);
 
   vec2 j1Dir = vec2(-sin(t * 0.78), cos(t * 1.02)) * 0.58;
   vec2 j2Dir = vec2(-sin(t * 0.62 + 3.14), cos(t * 0.86 + 1.57)) * 0.58;
@@ -277,10 +279,13 @@ vec3 tonemapACES(vec3 x) {
 }
 
 void main() {
-  vec2 px = vec2(2.0 / max(1.0, uTimeRes.y), 2.0 / max(1.0, uTimeRes.z));
-  vec4 c = texture2D(uFluidTex, vFboUv);
-  vec4 cx = texture2D(uFluidTex, vFboUv + vec2(px.x, 0.0));
-  vec4 cy = texture2D(uFluidTex, vFboUv + vec2(0.0, px.y));
+  float viewAspect = uTimeRes.w;
+  vec2 coverScale = viewAspect < 1.0 ? vec2(viewAspect, 1.0) : vec2(1.0, 1.0 / max(viewAspect, 0.001));
+  vec2 uv = vec2(0.5) + (vFboUv - vec2(0.5)) * coverScale;
+  vec2 px = vec2(2.0 / 256.0, 2.0 / 256.0);
+  vec4 c = texture2D(uFluidTex, uv);
+  vec4 cx = texture2D(uFluidTex, uv + vec2(px.x, 0.0));
+  vec4 cy = texture2D(uFluidTex, uv + vec2(0.0, px.y));
 
   float cB = pow(c.b, 1.15) * 1.45;
   float cA = pow(c.a, 1.25) * 1.15;
@@ -1153,9 +1158,25 @@ export function startWebglShaderFallback(
       gl.bindTexture(gl.TEXTURE_2D, ppTex[readIdx]);
       gl.uniform1i(simLocs.prevTex, 0);
       gl.uniform4f(simLocs.timeRes, elapsed, simSize, simSize, dt);
-      // Flip Y into FBO space (bottom-left origin)
-      gl.uniform4f(simLocs.pointer, ptr.uvX, 1.0 - ptr.uvY, ptr.vx, -ptr.vy);
-      gl.uniform4f(simLocs.control, ptr.pressed ? 1.0 : 0.0, 1.0, 0.985, 0.0);
+      // Map screen pointer & velocity into the 1:1 square cover-cropped FBO space
+      const covScaleX = aspect < 1 ? aspect : 1;
+      const covScaleY = aspect > 1 ? 1 / aspect : 1;
+      const fboPtrX = 0.5 + (ptr.uvX - 0.5) * covScaleX;
+      const fboPtrY = 0.5 + (1.0 - ptr.uvY - 0.5) * covScaleY;
+      gl.uniform4f(
+        simLocs.pointer,
+        fboPtrX,
+        fboPtrY,
+        ptr.vx * covScaleX,
+        -ptr.vy * covScaleY
+      );
+      gl.uniform4f(
+        simLocs.control,
+        ptr.pressed ? 1.0 : 0.0,
+        covScaleX,
+        covScaleY,
+        0.0
+      );
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       readIdx = writeIdx;

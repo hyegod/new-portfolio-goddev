@@ -3,7 +3,7 @@ import { index_of } from "./fluid-common.wgsl";
 struct DisplayConfig {
   output_size: vec2f,
 }
-const DYE_SIZE = vec2u(512, 288);
+const DYE_SIZE = vec2u(416, 416);
 @group(0) @binding(0) var<uniform> config: DisplayConfig;
 @group(0) @binding(1) var<storage, read> dye: array<vec4f>;
 
@@ -18,15 +18,26 @@ fn sample_dye(p: vec2f) -> vec3f {
 
 @fragment
 fn fragment_main(@builtin(position) position: vec4f) -> @location(0) vec4f {
-  var uv = position.xy / config.output_size;
-  uv.y = 1.0 - uv.y; // WebGPU fragment coordinates start at the top; the solver's +Y points up.
+  var screenUv = position.xy / max(config.output_size, vec2f(1.0));
+  screenUv.y = 1.0 - screenUv.y; // WebGPU fragment coordinates start at the top; the solver's +Y points up.
+
+  // Object-fit: cover mapping so fluid vortices stay 1:1 circular across portrait phones, tablets, and desktops
+  let viewAspect = config.output_size.x / max(config.output_size.y, 1.0);
+  let simAspect = f32(DYE_SIZE.x) / f32(DYE_SIZE.y);
+  var coverScale = vec2f(1.0, 1.0);
+  if (viewAspect < simAspect) {
+    coverScale.x = viewAspect / simAspect;
+  } else {
+    coverScale.y = simAspect / viewAspect;
+  }
+  let uv = vec2f(0.5) + (screenUv - vec2f(0.5)) * coverScale;
   let density = sample_dye(uv);
 
   // Exposed Concrete #ECEEF0 drafting paper + hairline engineering grid
   var paper = mix(
     vec3f(0.952, 0.958, 0.966),
     vec3f(0.916, 0.925, 0.937),
-    smoothstep(0.05, 0.95, length(uv - 0.5) * 1.35),
+    smoothstep(0.05, 0.95, length(screenUv - 0.5) * 1.35),
   );
   let gridUv = fract(position.xy / 40.0);
   let gridLine = max(step(gridUv.x, 0.025), step(gridUv.y, 0.025));
@@ -46,8 +57,9 @@ fn fragment_main(@builtin(position) position: vec4f) -> @location(0) vec4f {
   pigment = mix(pigment, deepInk, smoothstep(0.32, 0.72, inkWeight) * 0.74);
 
   // Subtle hydraulic flow sheen + fine white pressure isoline contours inside fluid ribbons
-  let dx = sample_dye(uv + vec2f(1.5 / 512.0, 0.0)) - density;
-  let dy = sample_dye(uv + vec2f(0.0, 1.5 / 288.0)) - density;
+  let texel = 1.5 / vec2f(DYE_SIZE);
+  let dx = sample_dye(uv + vec2f(texel.x, 0.0)) - density;
+  let dy = sample_dye(uv + vec2f(0.0, texel.y)) - density;
   let sheen = clamp((length(dx) + length(dy)) * 1.65, 0.0, 1.0);
   let iso = abs(fract(total * 2.4) - 0.5);
   let isoLine = (1.0 - smoothstep(0.012, 0.042, iso)) * smoothstep(0.24, 0.78, amount);
