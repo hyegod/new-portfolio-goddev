@@ -1,4 +1,5 @@
 import type { PointPresetId } from "@/data/portfolio";
+import { yieldToMain } from "@/lib/devicePerf";
 
 export interface PointCloudData {
   id: string;
@@ -587,6 +588,7 @@ export async function imageFileToPointCloud(
 
     const cdf = new Float32Array(totalPixels);
     let cumulative = 0;
+    let deadline = performance.now() + 40;
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
@@ -615,6 +617,10 @@ export async function imageFileToPointCloud(
         cumulative += w;
         cdf[p] = cumulative;
       }
+      if ((y & 31) === 31 && performance.now() >= deadline) {
+        await yieldToMain();
+        deadline = performance.now() + 40;
+      }
     }
 
     const rng = createRng(file.size ^ Date.now());
@@ -625,6 +631,10 @@ export async function imageFileToPointCloud(
     const worldH = aspect >= 1 ? 2.15 / aspect : 2.15;
 
     for (let i = 0; i < count; i++) {
+      if ((i & 4095) === 4095 && performance.now() >= deadline) {
+        await yieldToMain();
+        deadline = performance.now() + 40;
+      }
       const target = rng() * cumulative;
       let lo = 0;
       let hi = totalPixels - 1;

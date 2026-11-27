@@ -2,6 +2,7 @@ import type { Vec3 } from "math";
 import { clock, frameLoop, surface, type Gpu, type Surface } from "vgpu";
 import { orbitRig, smoothRig, type OrbitRig } from "vgpu/scene";
 
+import { detectPerformanceProfile } from "@/lib/devicePerf";
 import { applyView, cameraRay, followRobot, VIEWS } from "./camera";
 import {
   advance,
@@ -59,8 +60,10 @@ export function createRenderer({
   let toolbar: Toolbar | undefined;
   let loop: { stop(): void } | undefined;
   let intersection: IntersectionObserver | undefined;
+  let cvTarget: Element | undefined;
   let unsubscribeResize: (() => void) | undefined;
   let isVisible = true;
+  let cvSkipped = false;
 
   const goal: OrbitRig = orbitRig(VIEWS[DEFAULT_PRESET]);
   const current: OrbitRig = orbitRig(VIEWS[DEFAULT_PRESET]);
@@ -80,6 +83,9 @@ export function createRenderer({
     hovered = false;
   };
   const onWindowBlur = () => input?.cancel();
+  const onCvChange = (event: Event) => {
+    cvSkipped = Boolean((event as Event & { skipped?: boolean }).skipped);
+  };
 
   let settingsRef: Settings | undefined;
 
@@ -90,6 +96,7 @@ export function createRenderer({
       () => loop?.stop(),
       () => unsubscribeResize?.(),
       () => intersection?.disconnect(),
+      () => cvTarget?.removeEventListener("contentvisibilityautostatechange", onCvChange),
       () => onMotionChange && motion?.removeEventListener("change", onMotionChange),
       () => hoverTarget.removeEventListener("pointerenter", onPointerEnter),
       () => hoverTarget.removeEventListener("pointerleave", onPointerLeave),
@@ -162,10 +169,15 @@ export function createRenderer({
     }
 
     gpu = nextGpu;
-    output = surface(gpu, canvas, { dpr: [1, 1.75] });
+    const perfTier = detectPerformanceProfile().tier;
+    output = surface(gpu, canvas, {
+      dpr: [1, perfTier === "high" ? 1.5 : 1.25],
+    });
+    const adaptiveRobots =
+      perfTier === "high" ? PRESETS[DEFAULT_PRESET].count : 8;
     const garden = createColony({
       seed: DEFAULT_SEED,
-      count: PRESETS[DEFAULT_PRESET].count,
+      count: adaptiveRobots,
     });
     colony = garden;
     pipeline = createPipeline(gpu, garden, output.size);
@@ -255,6 +267,12 @@ export function createRenderer({
     };
     motion?.addEventListener("change", onMotionChange);
 
+    cvTarget =
+      canvas.closest(
+        ".deferred-section, .deferred-slogan, .deferred-works, .deferred-gallery, .deferred-footer, .deferred-lab"
+      ) ?? canvas;
+    cvTarget.addEventListener("contentvisibilityautostatechange", onCvChange);
+
     if (typeof IntersectionObserver !== "undefined") {
       intersection = new IntersectionObserver(
         (entries) => {
@@ -284,7 +302,7 @@ export function createRenderer({
     let renderTime = 0;
 
     loop = frameLoop(gpu, (currentFrame) => {
-      if (!isVisible || document.hidden) return;
+      if (!isVisible || cvSkipped || document.hidden) return;
       guard(() => {
         if (disposed || !output || !pipeline || !input) return;
         const dt = Math.min(ticks.deltaTime, 0.1);

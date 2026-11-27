@@ -49,9 +49,9 @@ const BURST_WORDS = 4;
 /** Landscape canvas height in CSS pixels the spark energy is tuned for. */
 const REFERENCE_HEIGHT = 720;
 export const MAX_BURSTS = 4;
-/** Particle counts offered in the controls; the default is 2^18. */
-export const PARTICLE_COUNTS = { '65k': 65_536, '262k': 262_144, '524k': 524_288, '1M': 1_048_576 } as const;
-export const DEFAULT_COUNT = PARTICLE_COUNTS['524k'];
+/** Particle counts offered in the controls; calibrated reference is 262k. */
+export const PARTICLE_COUNTS = { '65k': 65_536, '131k': 131_072, '262k': 262_144, '524k': 524_288 } as const;
+export const DEFAULT_COUNT = PARTICLE_COUNTS['262k'];
 /** Particle count the spark energy is tuned for. */
 const REFERENCE_COUNT = PARTICLE_COUNTS['262k'];
 
@@ -76,7 +76,7 @@ export interface Look {
 }
 
 export const DEFAULT_LOOK: Look = {
-  colorMode: COLOR_MODES.Velocity,
+  colorMode: COLOR_MODES.Shape,
   size: 1.7,
   streak: 0.016,
   bloom: true,

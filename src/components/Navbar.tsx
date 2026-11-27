@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRight, Menu, X } from "lucide-react";
@@ -18,12 +18,19 @@ export function Navbar() {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [scrolled, setScrolled] = useState(false);
+  const scrolledRef = useRef(false);
   const [activeSection, setActiveSection] = useState<string>("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [clockText, setClockText] = useState("LOCAL");
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 36);
+    const onScroll = () => {
+      const next = window.scrollY > 36;
+      if (next !== scrolledRef.current) {
+        scrolledRef.current = next;
+        setScrolled(next);
+      }
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -86,9 +93,9 @@ export function Navbar() {
   return (
     <>
       <motion.header
-        initial={{ y: -16, opacity: 0, filter: "blur(6px)" }}
-        animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-        transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ y: -12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="fixed inset-x-0 top-0 z-50 px-3 pt-2.5 min-[380px]:px-4 min-[380px]:pt-3 sm:px-8 lg:px-12"
       >
         <div

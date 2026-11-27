@@ -10,23 +10,27 @@ import { PageTransitionProvider } from "@/components/PageTransitionProvider";
 
 const syne = Syne({
   subsets: ["latin"],
-  weight: ["700", "800"],
+  weight: ["800"],
   variable: "--font-syne",
   display: "swap",
+  adjustFontFallback: true,
 });
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "700"],
   variable: "--font-space-grotesk",
   display: "swap",
+  adjustFontFallback: true,
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "600"],
   variable: "--font-jetbrains-mono",
   display: "swap",
+  preload: false,
+  adjustFontFallback: true,
 });
 
 const permanentMarker = Permanent_Marker({
@@ -34,6 +38,7 @@ const permanentMarker = Permanent_Marker({
   weight: ["400"],
   variable: "--font-permanent-marker",
   display: "swap",
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {

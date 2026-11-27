@@ -12,10 +12,10 @@ import { EngineeringCursor } from "./EngineeringCursor";
 
 type TransitionPhase = "idle" | "exiting" | "entering";
 
-const EXIT_DURATION_MS = 320;
-const SETTLE_HOLD_MS = 45;
-const ENTER_DURATION_MS = 620;
-const SAFETY_TIMEOUT_MS = 2200;
+const EXIT_DURATION_MS = 160;
+const SETTLE_HOLD_MS = 16;
+const ENTER_DURATION_MS = 320;
+const SAFETY_TIMEOUT_MS = 1600;
 
 function snapScrollInstant(top: number) {
   window.dispatchEvent(

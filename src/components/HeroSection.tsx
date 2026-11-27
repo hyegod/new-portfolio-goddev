@@ -4,7 +4,11 @@ import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { PORTFOLIO_PROFILE } from "@/data/portfolio";
-import { useInViewport, usePerformanceProfile } from "@/lib/devicePerf";
+import {
+  scheduleBackgroundTask,
+  useInViewport,
+  usePerformanceProfile,
+} from "@/lib/devicePerf";
 import {
   generatePresetPointCloud,
   type PointCloudData,
@@ -24,11 +28,12 @@ const GHOST_LINES = [
 export function HeroSection() {
   const perf = usePerformanceProfile();
   const [heroCloud, setHeroCloud] = useState<PointCloudData | null>(null);
+  const [fluidBooted, setFluidBooted] = useState(false);
   const [pulseCount, setPulseCount] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const tapResetRef = useRef<number>(0);
-  const isHeroInView = useInViewport(sectionRef, "220px 0px");
+  const isHeroInView = useInViewport(sectionRef, "160px 0px");
 
   // Zero-rerender spring parallax planes (back ghost text / mid cobalt spray / front GO HARD)
   const rawX = useMotionValue(0);
@@ -59,33 +64,19 @@ export function HeroSection() {
     };
   }, []);
 
-  // Defer ambient 3D bridge generation until right after initial Hero paint for fast LCP
+  // Defer ambient GPU fluid & 3D bridge behind initial Hero LCP paint using background priority scheduling
+  useEffect(() => {
+    const cancelFluid = scheduleBackgroundTask(() => {
+      setFluidBooted(true);
+    }, 180);
+    return cancelFluid;
+  }, []);
+
   useEffect(() => {
     if (!perf) return;
-    let cancelled = false;
-    const win = window as Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-
-    const generate = () => {
-      if (cancelled) return;
+    return scheduleBackgroundTask(() => {
       setHeroCloud(generatePresetPointCloud("bridge", perf.heroPoints));
-    };
-
-    if (typeof win.requestIdleCallback === "function") {
-      const id = win.requestIdleCallback(generate, { timeout: 220 });
-      return () => {
-        cancelled = true;
-        win.cancelIdleCallback?.(id);
-      };
-    }
-
-    const timer = window.setTimeout(generate, 60);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
+    }, 260);
   }, [perf]);
 
   const handleHeroPointerMove = (e: PointerEvent<HTMLElement>) => {
@@ -137,12 +128,12 @@ export function HeroSection() {
       onClick={handleHeroClick}
       className="relative flex min-h-[100svh] flex-col justify-between overflow-hidden border-b border-black/12 px-3 pt-[74px] pb-4 min-[380px]:px-4 min-[380px]:pt-[84px] sm:px-8 sm:pb-5 lg:px-12"
     >
-      {/* Layer 0: Ambient Interactive Navier-Stokes Concrete × Cobalt Fluid (reacts to pointer without blocking UI/scroll) */}
+      {/* Layer 0: Ambient Interactive Navier-Stokes Concrete × Cobalt Fluid (deferred past LCP, unmounts off-screen) */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0 opacity-75"
       >
-        {isHeroInView && <LazyInteractiveFluidShowcase ambient />}
+        {fluidBooted && isHeroInView && <LazyInteractiveFluidShowcase ambient />}
       </div>
 
       {/* Architectural Concrete Crack Accents */}

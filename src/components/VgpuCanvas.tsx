@@ -185,6 +185,7 @@ export function VgpuCanvas({
     let gpu: Gpu | null = null;
     let webglHandle: { dispose: () => void } | null = null;
     let isVisible = true;
+    let cvSkipped = false;
     let canvasTouchedByWebgpu = false;
 
     // Interactive pointer & orbit state stored in closure (zero React rerenders)
@@ -286,6 +287,17 @@ export function VgpuCanvas({
     );
     io.observe(container);
 
+    const onCvChange = (event: Event) => {
+      cvSkipped = Boolean((event as Event & { skipped?: boolean }).skipped);
+    };
+    const cvTarget =
+      container.closest(
+        ".deferred-lab, .deferred-section, .deferred-slogan, .deferred-works, .deferred-gallery, .deferred-footer"
+      ) ?? container;
+    cvTarget.addEventListener("contentvisibilityautostatechange", onCvChange);
+
+    const isActiveVisible = () => isVisible && !cvSkipped;
+
     const launchWebglFallback = async () => {
       try {
         const { startWebglShaderFallback } = await import(
@@ -300,7 +312,7 @@ export function VgpuCanvas({
           maxDpr,
           reducedMotion,
           ptr,
-          isVisible: () => isVisible,
+          isVisible: isActiveVisible,
           isPaused: () => pausedRef.current,
           getVideoElement: () => videoRef.current,
           drawProceduralFeed: drawProceduralVideoFeed,
@@ -414,7 +426,7 @@ export function VgpuCanvas({
             frameLoop(
               instance,
               (f) => {
-                if (!isVisible || document.hidden || pausedRef.current) return;
+                if (!isActiveVisible() || document.hidden || pausedRef.current) return;
                 const dt = reducedMotion
                   ? 0.004
                   : Math.min(0.033, Math.max(0.004, gpuClock.deltaTime || 0.016));
@@ -493,7 +505,7 @@ export function VgpuCanvas({
             frameLoop(
               instance,
               (f) => {
-                if (!isVisible || document.hidden || pausedRef.current) return;
+                if (!isActiveVisible() || document.hidden || pausedRef.current) return;
                 const dt = reducedMotion
                   ? 0.004
                   : Math.min(0.033, gpuClock.deltaTime || 0.016);
@@ -568,7 +580,7 @@ export function VgpuCanvas({
             frameLoop(
               instance,
               (f) => {
-                if (!isVisible || document.hidden || pausedRef.current) return;
+                if (!isActiveVisible() || document.hidden || pausedRef.current) return;
                 const dt = reducedMotion
                   ? 0.003
                   : Math.min(0.033, gpuClock.deltaTime || 0.016);
@@ -614,6 +626,7 @@ export function VgpuCanvas({
     return () => {
       cancelled = true;
       io.disconnect();
+      cvTarget.removeEventListener("contentvisibilityautostatechange", onCvChange);
       if (ambient) {
         window.removeEventListener("pointermove", onAmbientWindowMove);
       } else {

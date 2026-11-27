@@ -32,20 +32,39 @@ export function EngineeringCursor() {
     let pressed = false;
     let mode: CursorMode = "default";
     let onDark = false;
+    let lastTarget: EventTarget | null = null;
+    let prevMode: CursorMode | "" = "";
+    let prevDark: boolean | null = null;
+    let prevPressed: boolean | null = null;
+    let prevVisible: boolean | null = null;
     let rafId = 0;
 
     const syncStateAttributes = () => {
-      dot.dataset.mode = mode;
-      dot.dataset.dark = onDark ? "true" : "false";
-      dot.dataset.pressed = pressed ? "true" : "false";
-      dot.dataset.visible = visible && mode !== "hidden" ? "true" : "false";
-
-      ring.dataset.mode = mode;
-      ring.dataset.dark = onDark ? "true" : "false";
-      ring.dataset.pressed = pressed ? "true" : "false";
-      ring.dataset.visible = visible && mode !== "hidden" ? "true" : "false";
-
-      label.textContent = mode === "orbit" ? "DRAG" : "";
+      const shown = visible && mode !== "hidden";
+      if (mode !== prevMode) {
+        prevMode = mode;
+        dot.dataset.mode = mode;
+        ring.dataset.mode = mode;
+        label.textContent = mode === "orbit" ? "DRAG" : "";
+      }
+      if (onDark !== prevDark) {
+        prevDark = onDark;
+        const val = onDark ? "true" : "false";
+        dot.dataset.dark = val;
+        ring.dataset.dark = val;
+      }
+      if (pressed !== prevPressed) {
+        prevPressed = pressed;
+        const val = pressed ? "true" : "false";
+        dot.dataset.pressed = val;
+        ring.dataset.pressed = val;
+      }
+      if (shown !== prevVisible) {
+        prevVisible = shown;
+        const val = shown ? "true" : "false";
+        dot.dataset.visible = val;
+        ring.dataset.visible = val;
+      }
     };
 
     const tick = () => {
@@ -73,6 +92,8 @@ export function EngineeringCursor() {
     };
 
     const detectContext = (target: EventTarget | null) => {
+      if (target === lastTarget) return;
+      lastTarget = target;
       const el = target instanceof Element ? target : null;
       if (!el) {
         mode = "default";

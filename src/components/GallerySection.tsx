@@ -298,7 +298,7 @@ export function GallerySection({
       className={
         standalone
           ? "relative border-b border-black/15 px-3 pt-28 pb-16 min-[380px]:px-4 sm:px-8 sm:pt-32 sm:pb-24 lg:px-12"
-          : "relative border-b border-black/15 px-3 py-16 min-[380px]:px-4 sm:px-8 sm:py-20 lg:px-12 lg:py-28"
+          : "deferred-gallery relative border-b border-black/15 px-3 py-16 min-[380px]:px-4 sm:px-8 sm:py-20 lg:px-12 lg:py-28"
       }
       aria-labelledby="gallery-heading"
     >
@@ -410,19 +410,19 @@ export function GallerySection({
                 key={photo.id}
                 initial={
                   standalone
-                    ? { opacity: 0, y: 18, filter: "blur(5px)" }
+                    ? { opacity: 0, y: 14 }
                     : false
                 }
                 animate={
                   standalone
-                    ? { opacity: 1, y: 0, filter: "blur(0px)" }
+                    ? { opacity: 1, y: 0 }
                     : undefined
                 }
                 transition={
                   standalone
                     ? {
-                        duration: 0.65,
-                        delay: Math.min(idx * 0.06, 0.3),
+                        duration: 0.45,
+                        delay: Math.min(idx * 0.05, 0.25),
                         ease: [0.22, 1, 0.36, 1],
                       }
                     : undefined
@@ -447,7 +447,9 @@ export function GallerySection({
                       <img
                         src={photo.imageUrl}
                         alt={photo.title}
-                        loading="lazy"
+                        loading={standalone && idx === 0 ? "eager" : "lazy"}
+                        fetchPriority={standalone && idx === 0 ? "high" : undefined}
+                        decoding={standalone && idx === 0 ? "sync" : "async"}
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -551,6 +553,7 @@ export function GallerySection({
                   <img
                     src={activePhoto.imageUrl}
                     alt={activePhoto.title}
+                    decoding="async"
                     className="max-h-[58vh] w-full object-contain lg:max-h-[70vh]"
                   />
                 ) : (

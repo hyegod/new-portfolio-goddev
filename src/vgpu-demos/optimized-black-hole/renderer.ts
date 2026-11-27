@@ -75,9 +75,11 @@ export function createRenderer({ canvas }: RendererOptions) {
   let loop: { stop(): void } | undefined;
   let observer: ResizeObserver | undefined;
   let intersection: IntersectionObserver | undefined;
+  let cvTarget: Element | undefined;
   let documentVisible =
     typeof document === "undefined" ? true : !document.hidden;
   let canvasIntersecting = true;
+  let cvSkipped = false;
 
   let started = false;
   let animationTime = 0;
@@ -115,10 +117,15 @@ export function createRenderer({ canvas }: RendererOptions) {
     documentVisible = !document.hidden;
     reconcileLoop();
   };
+  const onCvChange = (event: Event) => {
+    cvSkipped = Boolean((event as Event & { skipped?: boolean }).skipped);
+    reconcileLoop();
+  };
 
   function reconcileLoop(): void {
     if (!started || !gpu || !api) return;
-    const shouldRun = !disposed && documentVisible && canvasIntersecting;
+    const shouldRun =
+      !disposed && documentVisible && canvasIntersecting && !cvSkipped;
     if (shouldRun === Boolean(loop)) return;
     if (shouldRun) {
       lastFrameAt = undefined;
@@ -244,6 +251,7 @@ export function createRenderer({ canvas }: RendererOptions) {
     if (resizeFrame) cancelAnimationFrame(resizeFrame);
     observer?.disconnect();
     intersection?.disconnect();
+    cvTarget?.removeEventListener("contentvisibilityautostatechange", onCvChange);
     if (typeof window !== "undefined") {
       mobileQuery.removeEventListener("change", onLayoutChange);
       window.removeEventListener("pointermove", onPointerMove);
@@ -283,6 +291,11 @@ export function createRenderer({ canvas }: RendererOptions) {
     window.addEventListener("pointerout", onPointerOut, { passive: true });
     window.addEventListener("blur", recenterPointer);
     document.addEventListener("visibilitychange", onVisibilityChange);
+    cvTarget =
+      canvas.closest(
+        ".deferred-footer, .deferred-section, .deferred-slogan, .deferred-works, .deferred-gallery, .deferred-lab"
+      ) ?? canvas;
+    cvTarget.addEventListener("contentvisibilityautostatechange", onCvChange);
     if (typeof IntersectionObserver !== "undefined") {
       intersection = new IntersectionObserver(
         (entries) => {

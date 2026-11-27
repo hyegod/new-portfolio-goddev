@@ -77,55 +77,49 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
     if (rootRef.current) {
       const rootEl = rootRef.current;
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        // --- A. HERO SLOW BLUR-IN CHOREOGRAPHY (runs only on home route) ---
+        // --- A. HERO GPU-COMPOSITED ENTRANCE (zero filter:blur to keep LCP & first paint fast) ---
         if (rootEl.querySelector("#home")) {
-          const heroTl = gsap.timeline({ defaults: { ease: "power2.out" } });
+          const heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
 
           heroTl
             .from(".hero-top-item", {
-              y: -12,
+              y: -10,
               opacity: 0,
-              filter: "blur(6px)",
-              duration: 0.9,
-              stagger: 0.16,
-              clearProps: "transform,opacity,filter",
+              duration: 0.5,
+              stagger: 0.08,
+              clearProps: "transform,opacity",
             })
             .from(
               ".hero-line",
               {
-                y: 26,
+                y: 20,
                 opacity: 0,
-                filter: "blur(8px)",
-                duration: 1.0,
-                stagger: 0.14,
-                clearProps: "transform,opacity,filter",
+                duration: 0.65,
+                stagger: 0.07,
+                clearProps: "transform,opacity",
               },
-              0.2
+              0.08
             )
             .from(
               ".hero-spray",
               {
-                scale: 0.94,
-                y: 18,
+                scale: 0.96,
+                y: 14,
                 opacity: 0,
-                filter: "blur(10px)",
-                duration: 1.35,
-                ease: "power3.out",
-                clearProps: "transform,opacity,filter",
+                duration: 0.8,
+                clearProps: "transform,opacity",
               },
-              0.48
+              0.2
             )
             .from(
               ".hero-dock",
               {
-                y: 28,
+                y: 18,
                 opacity: 0,
-                filter: "blur(7px)",
-                duration: 1.05,
-                ease: "power2.out",
-                clearProps: "transform,opacity,filter",
+                duration: 0.6,
+                clearProps: "transform,opacity",
               },
-              0.95
+              0.38
             );
 
           // --- B. HERO SCROLL-SCRUBBED KINETIC PARALLAX ---
@@ -164,41 +158,39 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
           });
         }
 
-        // --- C. SLOW BLUR-IN HEADING GROUPS (Unhurried 0.24s stagger, 0.95s ease-out focus pull) ---
+        // --- C. GPU-COMPOSITED HEADING GROUPS (pure transform + opacity, zero blur repaint) ---
         gsap.utils.toArray<HTMLElement>("[data-anim='mask-group']").forEach((group) => {
           const lines = group.querySelectorAll<HTMLElement>(".mask-line");
           if (lines.length === 0) return;
           gsap.from(lines, {
-            y: 28,
+            y: 22,
             opacity: 0,
-            filter: "blur(7px)",
-            duration: 0.95,
-            stagger: 0.24,
-            ease: "power2.out",
-            clearProps: "transform,opacity,filter",
+            duration: 0.68,
+            stagger: 0.12,
+            ease: "power3.out",
+            clearProps: "transform,opacity",
             scrollTrigger: {
               trigger: group,
-              start: "top 86%",
+              start: "top 88%",
               once: true,
             },
           });
         });
 
-        // --- D. COBALT SPRAY SIGNATURE SLOW WIPE-DRAW + BLUR FOCUS ---
+        // --- D. COBALT SPRAY SIGNATURE WIPE-DRAW ---
         gsap.utils.toArray<HTMLElement>(".anim-spray-draw").forEach((el) => {
           gsap.fromTo(
             el,
-            { clipPath: "inset(0 100% 0 0)", opacity: 0.2, filter: "blur(6px)" },
+            { clipPath: "inset(0 100% 0 0)", opacity: 0.25 },
             {
               clipPath: "inset(0 0% 0 0)",
               opacity: 1,
-              filter: "blur(0px)",
-              duration: 1.55,
+              duration: 1.05,
               ease: "power3.out",
-              clearProps: "clipPath,opacity,filter",
+              clearProps: "clipPath,opacity",
               scrollTrigger: {
                 trigger: el,
-                start: "top 85%",
+                start: "top 86%",
                 once: true,
               },
             }
@@ -272,76 +264,72 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
           );
         }
 
-        // --- F. STAGGERED SLOW BLUR-IN GRIDS (Stats, Skill Cards, Works, Blueprint Plates) ---
+        // --- F. STAGGERED GPU-COMPOSITED GRIDS (Stats, Skill Cards, Works, Blueprint Plates) ---
         gsap.utils.toArray<HTMLElement>("[data-anim='stagger-group']").forEach((group) => {
           const items = group.querySelectorAll<HTMLElement>(".stagger-item");
           if (items.length === 0) return;
           gsap.from(items, {
-            y: 28,
+            y: 22,
             opacity: 0,
-            filter: "blur(6px)",
-            duration: 0.9,
-            stagger: 0.22,
-            ease: "power2.out",
-            clearProps: "transform,opacity,filter",
+            duration: 0.65,
+            stagger: 0.1,
+            ease: "power3.out",
+            clearProps: "transform,opacity",
             scrollTrigger: {
               trigger: group,
-              start: "top 86%",
+              start: "top 88%",
               once: true,
             },
           });
         });
 
-        // --- G. SLOW BLUR-IN EXPERIENCE LEDGER ROWS ---
+        // --- G. EXPERIENCE LEDGER ROWS ---
         gsap.utils.toArray<HTMLElement>("[data-anim='slide-group']").forEach((group) => {
           const rows = group.querySelectorAll<HTMLElement>(".slide-row");
           if (rows.length === 0) return;
           gsap.from(rows, {
-            y: 22,
+            y: 18,
             opacity: 0,
-            filter: "blur(6px)",
-            duration: 0.9,
-            stagger: 0.24,
-            ease: "power2.out",
-            clearProps: "transform,opacity,filter",
+            duration: 0.62,
+            stagger: 0.1,
+            ease: "power3.out",
+            clearProps: "transform,opacity",
             scrollTrigger: {
               trigger: group,
-              start: "top 87%",
+              start: "top 88%",
               once: true,
             },
           });
         });
 
-        // --- H. CINEMATIC SLOW BLUR-IN REVEAL FOR 3D WEBGL STAGES ---
+        // --- H. COMPOSITED REVEAL FOR 3D WEBGL / WEBGPU STAGES ---
         gsap.utils.toArray<HTMLElement>(".anim-stage-reveal").forEach((stage) => {
           gsap.from(stage, {
-            y: 34,
-            scale: 0.975,
+            y: 24,
+            scale: 0.985,
             opacity: 0,
-            filter: "blur(6px)",
-            duration: 1.15,
-            ease: "power2.out",
-            clearProps: "transform,opacity,filter",
+            duration: 0.78,
+            ease: "power3.out",
+            clearProps: "transform,opacity",
             scrollTrigger: {
               trigger: stage,
-              start: "top 85%",
+              start: "top 88%",
               once: true,
             },
           });
         });
 
-        // --- I. INDIVIDUAL SLOW BLUR-IN REVEAL BLOCKS ---
+        // --- I. INDIVIDUAL REVEAL BLOCKS ---
         gsap.utils.toArray<HTMLElement>(".reveal-up").forEach((el) => {
           gsap.from(el, {
-            y: 26,
+            y: 20,
             opacity: 0,
-            filter: "blur(6px)",
-            duration: 0.92,
-            ease: "power2.out",
-            clearProps: "transform,opacity,filter",
+            duration: 0.64,
+            ease: "power3.out",
+            clearProps: "transform,opacity",
             scrollTrigger: {
               trigger: el,
-              start: "top 88%",
+              start: "top 90%",
               once: true,
             },
           });
@@ -349,13 +337,18 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
       }, rootRef);
     }
 
-    // Refresh ScrollTrigger accurately once Google Fonts finish loading or layout height shifts
+    // Refresh ScrollTrigger only when document height changes meaningfully (avoids layout-thrash cascades)
     let resizeTimer = 0;
+    let lastBodyHeight = document.body.scrollHeight;
     const ro = new ResizeObserver(() => {
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
-        ScrollTrigger.refresh();
-      }, 150);
+        const nextHeight = document.body.scrollHeight;
+        if (Math.abs(nextHeight - lastBodyHeight) > 12) {
+          lastBodyHeight = nextHeight;
+          ScrollTrigger.refresh();
+        }
+      }, 220);
     });
     ro.observe(document.body);
 

@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   compress: true,
   allowedDevOrigins: ["10.225.194.225"],
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",
@@ -14,13 +15,26 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        source: "/icon.svg",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+    ];
+  },
   turbopack: {
     rules: {
       "*.wgsl": wgslTurbopackRule({ minify: true }),
     },
   },
   experimental: {
-    optimizePackageImports: ["motion/react"],
+    optimizePackageImports: ["motion/react", "motion", "lucide-react", "three"],
   },
 };
 

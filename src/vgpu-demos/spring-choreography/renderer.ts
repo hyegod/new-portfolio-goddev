@@ -36,10 +36,12 @@ import {
   type SpringTable,
   type StaggerEase,
 } from "./choreography";
+import { detectPerformanceProfile } from "@/lib/devicePerf";
 import {
   DEFAULT_COUNT,
   DEFAULT_LOOK,
   MAX_BURSTS,
+  PARTICLE_COUNTS,
   createPipeline,
   type Burst,
   type ColorMode,
@@ -75,7 +77,7 @@ interface LiveBurst extends Burst {
   readonly born: number;
 }
 
-const MAX_DPR = 1.75;
+const MAX_DPR = 1.5;
 const TRAIL_KEEP = 0.8;
 const TRAIL_CUT = 0.25;
 const BURST_AMPLITUDE = 0.2;
@@ -118,9 +120,20 @@ export function createRenderer({
   let pipeline: Pipeline | undefined;
   let motion: MediaQueryList | undefined;
   let intersection: IntersectionObserver | undefined;
+  let cvTarget: Element | undefined;
   let unsubscribeResize: (() => void) | undefined;
   let ticking = false;
   let isVisible = true;
+  let cvSkipped = false;
+  let started = false;
+
+  const perfTier = detectPerformanceProfile().tier;
+  const adaptiveCount =
+    perfTier === "low"
+      ? PARTICLE_COUNTS["65k"]
+      : perfTier === "medium"
+        ? PARTICLE_COUNTS["131k"]
+        : DEFAULT_COUNT;
 
   const settings: Settings = {
     speed: 1,
@@ -128,7 +141,7 @@ export function createRenderer({
     ...DEFAULT_SPRING,
     pattern: "auto",
     ...DEFAULT_STAGGER,
-    count: DEFAULT_COUNT,
+    count: adaptiveCount,
     colorMode: DEFAULT_LOOK.colorMode,
     streaks: DEFAULT_LOOK.streak,
     trails: true,
@@ -314,12 +327,36 @@ export function createRenderer({
   };
 
   const tick = () => {
-    if (!isVisible || document.hidden) return;
+    if (!isVisible || cvSkipped || document.hidden) return;
     try {
       render();
     } catch {
       dispose();
     }
+  };
+
+  const reconcileLoop = () => {
+    if (!started || disposed) return;
+    const shouldRun = isVisible && !cvSkipped && !document.hidden;
+    if (shouldRun) {
+      if (!ticking) {
+        motionFrame.render(tick, true);
+        ticking = true;
+      }
+      if (playing) controls?.play();
+    } else {
+      if (ticking) {
+        cancelFrame(tick);
+        ticking = false;
+      }
+      controls?.pause();
+    }
+  };
+
+  const onVisibilityChange = () => reconcileLoop();
+  const onCvChange = (event: Event) => {
+    cvSkipped = Boolean((event as Event & { skipped?: boolean }).skipped);
+    reconcileLoop();
   };
 
   const render = () => {
@@ -395,6 +432,12 @@ export function createRenderer({
       () => controls?.stop(),
       () => unsubscribeResize?.(),
       () => intersection?.disconnect(),
+      () => cvTarget?.removeEventListener("contentvisibilityautostatechange", onCvChange),
+      () => {
+        if (typeof document !== "undefined") {
+          document.removeEventListener("visibilitychange", onVisibilityChange);
+        }
+      },
       () => motion?.removeEventListener("change", onMotionPreference),
       () => {
         container?.removeEventListener("pointermove", onPointerMove);
@@ -463,10 +506,18 @@ export function createRenderer({
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onPointerUp);
 
+    cvTarget =
+      canvas.closest(
+        ".deferred-slogan, .deferred-section, .deferred-works, .deferred-gallery, .deferred-footer, .deferred-lab"
+      ) ?? canvas;
+    cvTarget.addEventListener("contentvisibilityautostatechange", onCvChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     if (typeof IntersectionObserver !== "undefined") {
       intersection = new IntersectionObserver(
         (entries) => {
           isVisible = entries[entries.length - 1]?.isIntersecting ?? isVisible;
+          reconcileLoop();
         },
         { threshold: 0 }
       );
@@ -475,8 +526,8 @@ export function createRenderer({
 
     controls = animate(timelineSequence(playhead), { repeat: Infinity });
     applySpeed();
-    motionFrame.render(tick, true);
-    ticking = true;
+    started = true;
+    reconcileLoop();
   };
 
   const ready = initialize().catch((error: unknown) => {

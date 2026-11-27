@@ -12,11 +12,11 @@ import { LazyMechanicalGardenShowcase } from "./VgpuShowcases";
 
 export function AboutSection() {
   const kinematicsRef = useRef<HTMLDivElement>(null);
-  const showKinematics = useInViewport(kinematicsRef, "420px 0px");
+  const showKinematics = useInViewport(kinematicsRef, "220px 0px");
   return (
     <section
       id="about"
-      className="relative overflow-hidden border-b border-black/15 px-3 py-16 min-[380px]:px-4 sm:px-8 sm:py-20 lg:px-12 lg:py-28"
+      className="deferred-section relative overflow-hidden border-b border-black/15 px-3 py-16 min-[380px]:px-4 sm:px-8 sm:py-20 lg:px-12 lg:py-28"
       aria-labelledby="about-heading"
     >
       <div className="mx-auto max-w-[1440px]">

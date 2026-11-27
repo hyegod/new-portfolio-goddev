@@ -17,27 +17,27 @@ export interface PerformanceProfile {
 const PROFILES: Record<DevicePerfTier, Omit<PerformanceProfile, "isTouchOnly">> = {
   high: {
     tier: "high",
-    heroPoints: 24000,
-    worksPoints: 34000,
-    galleryPoints: 64000,
-    maxDpr: 2,
+    heroPoints: 16000,
+    worksPoints: 30000,
+    galleryPoints: 52000,
+    maxDpr: 1.75,
     pointSizeBoost: 1,
   },
   medium: {
     tier: "medium",
-    heroPoints: 14000,
-    worksPoints: 20000,
-    galleryPoints: 36000,
-    maxDpr: 1.5,
+    heroPoints: 10000,
+    worksPoints: 18000,
+    galleryPoints: 32000,
+    maxDpr: 1.4,
     pointSizeBoost: 1.12,
   },
   low: {
     tier: "low",
-    heroPoints: 9000,
-    worksPoints: 14000,
-    galleryPoints: 24000,
-    maxDpr: 1.25,
-    pointSizeBoost: 1.22,
+    heroPoints: 6000,
+    worksPoints: 12000,
+    galleryPoints: 20000,
+    maxDpr: 1.2,
+    pointSizeBoost: 1.24,
   },
 };
 
@@ -161,4 +161,75 @@ export function useInViewport(
   }, [ref, rootMargin]);
 
   return visible;
+}
+
+type SchedulerLike = {
+  yield?: () => Promise<void>;
+  postTask?: <T>(
+    cb: () => T | Promise<T>,
+    options?: { priority?: "user-blocking" | "user-visible" | "background"; signal?: AbortSignal }
+  ) => Promise<T>;
+};
+
+/**
+ * Modern Web Guidance (`break-up-long-tasks`): yields control back to the browser
+ * using `scheduler.yield()` when supported, falling back to a macrotask timer.
+ */
+export function yieldToMain(): Promise<void> {
+  if (typeof window !== "undefined") {
+    const sched = (window as Window & { scheduler?: SchedulerLike }).scheduler;
+    if (sched && typeof sched.yield === "function") {
+      return sched.yield();
+    }
+  }
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * Modern Web Guidance (`schedule-tasks-by-priority`): defers non-urgent heavy work
+ * (like above-the-fold ambient GPU boot) behind critical first paint and user input.
+ */
+export function scheduleBackgroundTask(
+  task: () => void,
+  timeoutMs = 220
+): () => void {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  let cancelled = false;
+  const run = () => {
+    if (!cancelled) task();
+  };
+
+  const win = window as Window & {
+    scheduler?: SchedulerLike;
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    cancelIdleCallback?: (id: number) => void;
+  };
+
+  if (win.scheduler && typeof win.scheduler.postTask === "function") {
+    const controller = new AbortController();
+    win.scheduler
+      .postTask(run, { priority: "background", signal: controller.signal })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }
+
+  if (typeof win.requestIdleCallback === "function") {
+    const id = win.requestIdleCallback(run, { timeout: timeoutMs });
+    return () => {
+      cancelled = true;
+      win.cancelIdleCallback?.(id);
+    };
+  }
+
+  const timer = window.setTimeout(run, 48);
+  return () => {
+    cancelled = true;
+    window.clearTimeout(timer);
+  };
 }

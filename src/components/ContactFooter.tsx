@@ -12,7 +12,7 @@ export function ContactFooter() {
   const [localClock, setLocalClock] = useState("LOCAL");
   const footerRef = useRef<HTMLElement>(null);
   const creditsDialogRef = useRef<HTMLDialogElement>(null);
-  const isNearFooter = useInViewport(footerRef, "380px 0px");
+  const isNearFooter = useInViewport(footerRef, "220px 0px");
 
   useEffect(() => {
     const updateClock = () => {
@@ -82,7 +82,7 @@ export function ContactFooter() {
     <footer
       ref={footerRef}
       id="contact"
-      className="relative overflow-hidden bg-[#08090D] px-3 pt-16 pb-10 text-[#F2F4F7] min-[380px]:px-4 sm:px-8 sm:pt-24 lg:px-12 lg:pt-28"
+      className="deferred-footer relative overflow-hidden bg-[#08090D] px-3 pt-16 pb-10 text-[#F2F4F7] min-[380px]:px-4 sm:px-8 sm:pt-24 lg:px-12 lg:pt-28"
     >
       {/* Official Multi-Pass Baked Optimized Black Hole (vgpu · viewport-mounted + WebGL2 mobile fallback) */}
       {isNearFooter && (

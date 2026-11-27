@@ -35,14 +35,25 @@ export function createRenderer(options: RendererOptions) {
   let input: ReturnType<typeof installStirInput> | undefined;
   let intersection: IntersectionObserver | undefined;
   let unsubscribeResize: (() => void) | undefined;
+  let cvTarget: Element | undefined;
   let isVisible = true;
+  let cvSkipped = false;
+  let started = false;
   let animationFrame = 0;
   let accumulator = 0;
   let previous = 0;
 
+  const stopLoop = () => {
+    if (animationFrame) {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+    }
+  };
+
   const tick = (now: number) => {
-    if (disposed) return;
-    if (isVisible && !document.hidden && fluid && input && canvasSurface) {
+    animationFrame = 0;
+    if (disposed || !isVisible || cvSkipped || document.hidden) return;
+    if (fluid && input && canvasSurface) {
       const fixed = fixedStepCount(accumulator, (now - previous) / 1000);
       accumulator = fixed.accumulator;
       for (let i = 0; i < fixed.steps; i++) {
@@ -50,17 +61,38 @@ export function createRenderer(options: RendererOptions) {
       }
       renderFluid(fluid, canvasSurface);
     }
-    // Always reset the clock while hidden so visibility changes never catch up.
     previous = now;
     animationFrame = requestAnimationFrame(tick);
+  };
+
+  const reconcileLoop = () => {
+    if (!started || disposed) return;
+    const shouldRun = isVisible && !cvSkipped && !document.hidden;
+    if (shouldRun && !animationFrame) {
+      previous = performance.now();
+      accumulator = 0;
+      animationFrame = requestAnimationFrame(tick);
+    } else if (!shouldRun) {
+      stopLoop();
+    }
+  };
+
+  const onVisibilityChange = () => reconcileLoop();
+  const onCvChange = (event: Event) => {
+    cvSkipped = Boolean((event as Event & { skipped?: boolean }).skipped);
+    reconcileLoop();
   };
 
   function dispose() {
     if (disposed) return;
     disposed = true;
-    if (animationFrame) cancelAnimationFrame(animationFrame);
+    stopLoop();
     unsubscribeResize?.();
     intersection?.disconnect();
+    cvTarget?.removeEventListener("contentvisibilityautostatechange", onCvChange);
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
     input?.dispose();
     gpu?.dispose();
   }
@@ -79,7 +111,10 @@ export function createRenderer(options: RendererOptions) {
       return;
     }
     gpu = nextGpu;
-    canvasSurface = surface(gpu, options.canvas, { dpr: [1, 1.5] });
+    // Ambient dye grid is 512×288; capping DPR at 1.25 preserves crispness while cutting fragment bandwidth ~45%
+    canvasSurface = surface(gpu, options.canvas, {
+      dpr: options.ambient ? [1, 1.25] : [1, 1.5],
+    });
     fluid = createFluid(gpu);
     input = installStirInput(options.canvas, options.ambient);
     await prepareFluid(fluid, canvasSurface);
@@ -92,17 +127,24 @@ export function createRenderer(options: RendererOptions) {
         fail(error);
       }
     });
+    cvTarget =
+      options.canvas.closest(
+        ".deferred-section, .deferred-slogan, .deferred-works, .deferred-gallery, .deferred-footer, .deferred-lab"
+      ) ?? options.canvas;
+    cvTarget.addEventListener("contentvisibilityautostatechange", onCvChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     if (typeof IntersectionObserver !== "undefined") {
       intersection = new IntersectionObserver(
         (entries) => {
           isVisible = entries[entries.length - 1]?.isIntersecting ?? isVisible;
+          reconcileLoop();
         },
         { threshold: 0 }
       );
       intersection.observe(options.canvas);
     }
-    previous = performance.now();
-    animationFrame = requestAnimationFrame(tick);
+    started = true;
+    reconcileLoop();
   };
 
   const ready = initialize().catch((error: unknown) => {

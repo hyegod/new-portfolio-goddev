@@ -8,13 +8,13 @@ import { LazySpringChoreographyShowcase } from "./VgpuShowcases";
 
 export function SloganSection() {
   const sectionRef = useRef<HTMLElement>(null);
-  const showSpring = useInViewport(sectionRef, "420px 0px");
+  const showSpring = useInViewport(sectionRef, "220px 0px");
 
   return (
     <section
       id="slogan"
       ref={sectionRef}
-      className="relative overflow-hidden border-b border-black/25 bg-[#06070C] px-3 py-20 text-white min-[380px]:px-4 sm:px-8 sm:py-28 lg:px-12 lg:py-32"
+      className="deferred-slogan relative overflow-hidden border-b border-black/25 bg-[#06070C] px-3 py-20 text-white min-[380px]:px-4 sm:px-8 sm:py-28 lg:px-12 lg:py-32"
       aria-labelledby="slogan-heading"
     >
       {/* Live 500K GPU Particle Spring Choreography Backdrop (auto-mounts near viewport + WebGL2 fallback) */}
@@ -51,7 +51,7 @@ export function SloganSection() {
                 </span>
               </h2>
               <p className="mt-4 max-w-md font-mono text-[10px] tracking-[0.16em] text-white/60 uppercase">
-                MOVE POINTER TO PART 500K PARTICLES · CLICK CANVAS FOR SPRING BURST
+                MOVE POINTER TO PART GPU PARTICLES · CLICK CANVAS FOR SPRING BURST
               </p>
             </div>
 
@@ -63,7 +63,7 @@ export function SloganSection() {
                     SLOGAN // CONCRETE × CODE
                   </p>
                   <span className="font-mono text-[9px] tracking-[0.16em] text-white/50 uppercase sm:tracking-[0.18em]">
-                    SPRING · 500K PTS
+                    SPRING · 262K GPU
                   </span>
                 </div>
                 <p className="text-lg font-bold tracking-tight text-white sm:text-xl">

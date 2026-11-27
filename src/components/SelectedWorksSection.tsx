@@ -49,7 +49,7 @@ export function SelectedWorksSection({
   return (
     <section
       id="works"
-      className="relative border-b border-black/15 px-3 py-16 min-[380px]:px-4 sm:px-8 sm:py-20 lg:px-12 lg:py-28"
+      className="deferred-works relative border-b border-black/15 px-3 py-16 min-[380px]:px-4 sm:px-8 sm:py-20 lg:px-12 lg:py-28"
       aria-labelledby="works-heading"
     >
       <div className="mx-auto max-w-[1440px]">
