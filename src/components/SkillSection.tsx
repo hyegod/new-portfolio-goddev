@@ -1,10 +1,7 @@
 "use client";
 
-import { useRef } from "react";
 import { motion } from "motion/react";
 import { SKILL_PILLARS, type SkillTier } from "@/data/portfolio";
-import { useInViewport } from "@/lib/devicePerf";
-import { LazyRadianceCascadesShowcase } from "./VgpuShowcases";
 
 const STANDARDS = [
   "SNI 1726 & 2847",
@@ -27,9 +24,6 @@ function tierBadgeClass(tier: SkillTier) {
 }
 
 export function SkillSection() {
-  const giRef = useRef<HTMLDivElement>(null);
-  const showRadiance = useInViewport(giRef, "420px 0px");
-
   return (
     <section
       id="skill"
@@ -161,22 +155,6 @@ export function SkillSection() {
               {std}
             </span>
           ))}
-        </div>
-
-        {/* Interactive GPU Light-Study Drafting Board (Radiance Cascades — JFA SDF + 6 Cascades) */}
-        <div ref={giRef} className="mt-10 sm:mt-12">
-          <div className="reveal-up mb-3.5 flex flex-wrap items-baseline justify-between gap-2 font-mono text-[10px] tracking-[0.18em] uppercase sm:text-[11px] sm:tracking-[0.22em]">
-            <span className="font-semibold text-[#0038FF]">
-              REAL-TIME GRAPHICS // RADIANCE CASCADES · 2D GLOBAL ILLUMINATION
-            </span>
-            <span className="text-[#505562]">
-              DRAW LIGHT ON DRAFTING GRID · JUMP-FLOOD SDF + 6 CASCADES
-            </span>
-          </div>
-
-          <div className="anim-stage-reveal relative h-[400px] w-full overflow-hidden rounded-2xl border border-black/20 bg-[#081912] shadow-[0_24px_54px_-18px_rgba(6,16,12,0.34)] sm:h-[480px]">
-            {showRadiance && <LazyRadianceCascadesShowcase />}
-          </div>
         </div>
       </div>
     </section>
