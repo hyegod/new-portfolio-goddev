@@ -171,7 +171,7 @@ export function RoamingBotsOverlay() {
       {enabled && (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
+          className="pointer-events-none fixed top-0 left-0 z-30 h-[100lvh] w-full overflow-hidden"
         >
           <canvas
             ref={canvasRef}
@@ -251,7 +251,7 @@ export function RoamingBotsOverlay() {
             ? "Hide roaming quadruped bots (hover to see name, click a bot to interact)"
             : "Enable roaming quadruped bots"
         }
-        className={`fixed bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[9px] font-semibold tracking-[0.16em] uppercase shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-all sm:bottom-5 ${
+        className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[9px] font-semibold tracking-[0.16em] uppercase shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-all sm:bottom-5 ${
           process.env.NODE_ENV === "development"
             ? "left-14 sm:left-16"
             : "left-3 sm:left-6"

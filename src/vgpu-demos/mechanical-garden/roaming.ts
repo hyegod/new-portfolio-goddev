@@ -210,16 +210,26 @@ function createFlatTerrain(): Terrain {
   return terrain;
 }
 
-/** Shift a robot's entire world state along Z so feet, swing arcs, body, and goal ride scroll 1:1 with zero IK strain. */
-function shiftRobotZ(robot: Robot, dz: number): void {
+/** Shift a robot's entire world state in X/Z so feet, swing arcs, body, and goal stay locked with zero IK strain. */
+function shiftRobotXZ(robot: Robot, dx: number, dz: number): void {
+  robot.position[0] += dx;
   robot.position[2] += dz;
+  robot.goal[0] += dx;
   robot.goal[1] += dz;
   for (let i = 0; i < robot.feet.length; i++) {
     const foot = robot.feet[i]!;
+    foot.position[0] += dx;
     foot.position[2] += dz;
+    foot.start[0] += dx;
     foot.start[2] += dz;
+    foot.landing[0] += dx;
     foot.landing[2] += dz;
   }
+}
+
+/** Shift a robot's entire world state along Z so feet, swing arcs, body, and goal ride scroll 1:1 with zero IK strain. */
+function shiftRobotZ(robot: Robot, dz: number): void {
+  shiftRobotXZ(robot, 0, dz);
 }
 
 /** Evaluate smooth kinematic emote offsets for an active trick (all solved through real 4-leg FABRIK IK). */
@@ -413,6 +423,8 @@ export function createRoamingRenderer({
 
   let outputWidth = 1;
   let outputHeight = 1;
+  let prevCssWidth = 0;
+  let prevCssHeight = 0;
   let lastFrameScrollY = typeof window !== "undefined" ? window.scrollY : 0;
   let scrollSpeedPx = 0;
   let lastPointerClient: [number, number] | null = null;
@@ -502,17 +514,31 @@ export function createRoamingRenderer({
     return screenOut;
   }
 
+  /**
+   * Bottom NDC Y of the actually visible window inside the static 100lvh canvas.
+   * Keeps waypoints, bottom edge spawns, and off-screen checks aligned even when a browser address bar is expanded.
+   */
+  function getVisibleBottomNdcY(): number {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.height <= 0) return -1.0;
+    const visH = Math.min(rect.height, window.innerHeight || rect.height);
+    return clamp(1.0 - (visH / rect.height) * 2.0, -1.0, -0.35);
+  }
+
   /** How far outside the padded screen border a robot sits in NDC units (0 when visible or partially visible). */
   function offscreenNdcDistance(robot: Robot): number {
     const [nx, ny] = projectWorldToNdc(robot.position[0], 0, robot.position[2]);
+    const visBottom = getVisibleBottomNdcY();
+    const minVisibleY = visBottom - (OFF_NDC_Y - 1.0);
     const dx = Math.max(0, Math.abs(nx) - OFF_NDC_X);
-    const dy = Math.max(0, Math.abs(ny) - OFF_NDC_Y);
+    const dy = Math.max(0, ny - OFF_NDC_Y, minVisibleY - ny);
     return Math.hypot(dx, dy);
   }
 
   function isInsideView(robot: Robot): boolean {
     const [nx, ny] = projectWorldToNdc(robot.position[0], 0, robot.position[2]);
-    return Math.abs(nx) <= 0.88 && Math.abs(ny) <= 0.86;
+    const visBottom = getVisibleBottomNdcY();
+    return Math.abs(nx) <= 0.88 && ny <= 0.86 && ny >= visBottom + 0.14;
   }
 
   function clientToPlane(
@@ -590,8 +616,12 @@ export function createRoamingRenderer({
   /** Pick an organic visible floor waypoint directly in NDC space so margins are uniform at every aspect ratio. */
   function pickWaypoint(index: number): [number, number] {
     const rng = randoms[index]!;
+    const visBottom = getVisibleBottomNdcY();
+    const minY = visBottom + 0.22;
+    const maxY = 0.68;
+    const spanY = Math.max(0.4, maxY - minY);
     let nx = (mulberry32.sample(rng) * 2 - 1) * 0.78;
-    let ny = -0.76 + mulberry32.sample(rng) * 1.44;
+    let ny = minY + mulberry32.sample(rng) * spanY;
 
     if (mulberry32.sample(rng) < 0.58) {
       if (mulberry32.sample(rng) < 0.54) {
@@ -600,7 +630,7 @@ export function createRoamingRenderer({
           ? 0.42 + mulberry32.sample(rng) * 0.36
           : -0.42 - mulberry32.sample(rng) * 0.36;
       } else {
-        ny = -0.74 + mulberry32.sample(rng) * 0.44;
+        ny = minY + mulberry32.sample(rng) * (spanY * 0.32);
       }
     }
     return ndcToFloor(nx, ny) ?? [0, 0];
@@ -609,9 +639,12 @@ export function createRoamingRenderer({
   /** Occasionally let a settled bot stroll calmly off the left or right viewport margin. */
   function pickExitPoint(index: number): [number, number] {
     const rng = randoms[index]!;
+    const visBottom = getVisibleBottomNdcY();
+    const minY = visBottom + 0.26;
+    const maxY = 0.64;
     const goRight = mulberry32.sample(rng) < 0.5;
     const nx = goRight ? 1.24 : -1.24;
-    const ny = -0.68 + mulberry32.sample(rng) * 1.3;
+    const ny = minY + mulberry32.sample(rng) * Math.max(0.35, maxY - minY);
     return ndcToFloor(nx, ny) ?? [goRight ? 8 : -8, 0];
   }
 
@@ -631,18 +664,22 @@ export function createRoamingRenderer({
       edge = roll < 0.32 ? 0 : roll < 0.64 ? 1 : roll < 0.84 ? 2 : 3;
     }
 
+    const visBottom = getVisibleBottomNdcY();
+    const sideMinY = visBottom + 0.24;
+    const sideSpanY = Math.max(0.35, 0.62 - sideMinY);
+
     const sampleSpawnForEdge = (e: 0 | 1 | 2 | 3): [number, number] => {
       if (e === 0) {
-        const ny = -0.68 + mulberry32.sample(rng) * 1.28;
+        const ny = sideMinY + mulberry32.sample(rng) * sideSpanY;
         return ndcToFloor(-SPAWN_NDC_X, ny) ?? [-7.2, 0];
       }
       if (e === 1) {
-        const ny = -0.68 + mulberry32.sample(rng) * 1.28;
+        const ny = sideMinY + mulberry32.sample(rng) * sideSpanY;
         return ndcToFloor(SPAWN_NDC_X, ny) ?? [7.2, 0];
       }
       if (e === 2) {
         const nx = (mulberry32.sample(rng) * 2 - 1) * 0.72;
-        return ndcToFloor(nx, -SPAWN_NDC_Y) ?? [0, 5.4];
+        return ndcToFloor(nx, visBottom - (SPAWN_NDC_Y - 1.0)) ?? [0, 5.4];
       }
       const nx = (mulberry32.sample(rng) * 2 - 1) * 0.72;
       return ndcToFloor(nx, SPAWN_NDC_Y) ?? [0, -6.6];
@@ -1327,8 +1364,9 @@ export function createRoamingRenderer({
         );
         item.centerX = cx;
         item.centerY = cy;
+        const visH = Math.min(rect.height, window.innerHeight || rect.height);
         item.labelX = clamp(lx, 96, Math.max(96, rect.width - 96));
-        item.labelY = clamp(ly - 14, 78, Math.max(78, rect.height - 44));
+        item.labelY = clamp(ly - 14, 78, Math.max(78, visH - 44));
       }
     }
 
@@ -1353,14 +1391,74 @@ export function createRoamingRenderer({
     pad1: 0,
   };
 
-  function updateCamera(): void {
+  function updateCamera(preserveScreenPositions = false): void {
+    const rect = canvas.getBoundingClientRect();
+    const cssW = rect.width;
+    const cssH = rect.height;
+
+    // On vertical-only chrome resizes (e.g. dynamic address bar or bookmarks bar), capture each
+    // grounded robot's exact screen pixel position before updating projection so it stays pixel-locked.
+    let savedPixels: ([number, number] | null)[] | null = null;
+    if (
+      preserveScreenPositions &&
+      started &&
+      prevCssWidth > 0 &&
+      prevCssHeight > 0 &&
+      cssW > 0 &&
+      cssH > 0 &&
+      Math.abs(cssW - prevCssWidth) < 4 &&
+      Math.abs(cssH - prevCssHeight) > 1 &&
+      Math.abs(cssH - prevCssHeight) < 220
+    ) {
+      const prevRect = {
+        left: rect.left,
+        top: rect.top,
+        width: prevCssWidth,
+        height: prevCssHeight,
+      } as DOMRect;
+      savedPixels = robots.map((r, i) => {
+        if (airborne[i] || offscreenNdcDistance(r) > 0.25) return null;
+        const [sx, sy] = projectWorldToCss(
+          r.position[0],
+          0,
+          r.position[2],
+          prevRect
+        );
+        return [sx, sy];
+      });
+    }
+
     const aspect = outputWidth / Math.max(1, outputHeight);
-    orbit.distance = aspect < 1.15 ? 33.0 : 29.0;
+    // Smooth continuous distance curve (no sudden zoom cliff when browser height changes)
+    const narrowT = clamp((1.35 - aspect) / 0.75, 0, 1);
+    orbit.distance = 29.0 + narrowT * 5.0;
     rigPose(orbit, pose);
     perspective(ROAM_LENS, aspect, projection);
     viewMatrices(pose, projection, matrices);
     cameraUniforms?.set(cameraValues);
     updateScrollCalibration();
+
+    if (savedPixels && cssW > 0 && cssH > 0) {
+      for (let i = 0; i < botCount; i++) {
+        const px = savedPixels[i];
+        if (!px) continue;
+        const ndcX = ((px[0] - rect.left) / cssW) * 2 - 1;
+        const ndcY = 1 - ((px[1] - rect.top) / cssH) * 2;
+        const nextFloor = ndcToFloor(ndcX, ndcY);
+        if (!nextFloor) continue;
+        const r = robots[i]!;
+        shiftRobotXZ(r, nextFloor[0] - r.position[0], nextFloor[1] - r.position[2]);
+      }
+      if (rig) {
+        poseRig(rig, robots, botCount);
+        publishRig(rig, robots, botCount);
+      }
+    }
+
+    if (cssW > 0 && cssH > 0) {
+      prevCssWidth = cssW;
+      prevCssHeight = cssH;
+    }
   }
 
   let accumulator = 0;
@@ -1581,7 +1679,7 @@ export function createRoamingRenderer({
     unsubscribeResize = output.onResize(({ width, height }) => {
       outputWidth = width;
       outputHeight = height;
-      updateCamera();
+      updateCamera(true);
     });
 
     window.addEventListener("pointerdown", onWindowPointerDown, {
