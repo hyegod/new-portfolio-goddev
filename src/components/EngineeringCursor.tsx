@@ -119,11 +119,25 @@ export function EngineeringCursor() {
       if (el.closest("canvas.touch-none")) {
         mode = "orbit";
       } else if (
+        document.documentElement.dataset.botHover === "true" ||
         el.closest("a, button, [role='button'], [role='tab'], label[for], .cursor-pointer")
       ) {
         mode = "pointer";
       } else {
         mode = "default";
+      }
+    };
+
+    const onBotHoverChange = () => {
+      lastTarget = null;
+      if (visible) {
+        mode =
+          document.documentElement.dataset.botHover === "true"
+            ? "pointer"
+            : mode === "pointer"
+              ? "default"
+              : mode;
+        syncStateAttributes();
       }
     };
 
@@ -176,6 +190,7 @@ export function EngineeringCursor() {
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
     window.addEventListener("pointerup", onPointerUp, { passive: true });
+    window.addEventListener("goddev:bot-hover", onBotHoverChange);
     document.addEventListener("mouseleave", onWindowLeave);
     window.addEventListener("blur", onWindowBlur);
 
@@ -185,6 +200,7 @@ export function EngineeringCursor() {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("goddev:bot-hover", onBotHoverChange);
       document.removeEventListener("mouseleave", onWindowLeave);
       window.removeEventListener("blur", onWindowBlur);
     };

@@ -797,3 +797,52 @@ dialog.editorial-dialog::backdrop {
     transition: none !important;
   }
 }
+
+/* Roaming Quadruped Bots: Floating Callsign Badge & Kinetic Cobalt Ping Ring */
+.bot-hud-badge {
+  opacity: 0;
+  transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bot-hud-badge[data-visible="true"] {
+  opacity: 1;
+}
+
+.bot-hud-status {
+  color: rgba(255, 255, 255, 0.62);
+  transition: color 160ms ease;
+}
+
+.bot-hud-status[data-active="true"] {
+  color: #6da4ff;
+}
+
+@keyframes bot-ping-expand {
+  0% {
+    transform: scale(0.32);
+    opacity: 0.92;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+.bot-ping-ring {
+  width: 96px;
+  height: 96px;
+  animation: bot-ping-expand 760ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bot-ping-ring-lg {
+  width: 152px;
+  height: 152px;
+  animation: bot-ping-expand 880ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bot-ping-ring-delayed {
+  width: 72px;
+  height: 72px;
+  opacity: 0;
+  animation: bot-ping-expand 720ms cubic-bezier(0.16, 1, 0.3, 1) 110ms forwards;
+}

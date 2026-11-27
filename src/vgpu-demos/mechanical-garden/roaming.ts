@@ -1,7 +1,7 @@
 // Document-anchored free-roaming quadruped companions powered by vgpu/scene + FABRIK IK.
 // Robots live on the webpage surface: scrolling down leaves them behind above the viewport,
 // and after leaving view they naturally trot back into your current section from any screen edge.
-// Single transparent MSAA render pass (alphaMode: "premultiplied", no terrain/plinth/shadow-map).
+// Hovering reveals each bot's callsign & role; clicking triggers real FABRIK IK tricks (bow, wiggle, hop, scan+zoom).
 
 import { clamp, type Vec3 } from "math";
 import { mulberry32, type Mulberry32 } from "math/random";
@@ -37,14 +37,64 @@ import {
   publishRig,
   type PartMesh,
 } from "./rig";
-import { createRobot, placeRobot, stepRobot, type Robot } from "./robot";
+import {
+  createRobot,
+  placeRobot,
+  stepRobot,
+  type Robot,
+  type RobotEmote,
+} from "./robot";
 import { createTerrain, type Terrain } from "./terrain";
 import roamingPartsShader from "./roaming-parts.wgsl";
 import roamingShadowShader from "./roaming-shadow.wgsl";
 
+export type BotTrickKind = "bow" | "wiggle" | "hop" | "scan";
+
+export interface RoamingBotMeta {
+  readonly id: number;
+  readonly name: string;
+  readonly role: string;
+}
+
+export const ROAMING_BOTS: readonly RoamingBotMeta[] = [
+  { id: 0, name: "AXIS-01", role: "STRUCTURAL SCOUT" },
+  { id: 1, name: "DATUM-02", role: "LIDAR SURVEYOR" },
+];
+
+export interface BotScreenTelemetry {
+  readonly index: number;
+  readonly name: string;
+  readonly role: string;
+  /** True when the floating HUD tag should render (hovered OR performing an interactive trick). */
+  readonly visible: boolean;
+  /** True while pointer is actively hovering this robot. */
+  readonly hovered: boolean;
+  /** Currently executing trick kind, or null. */
+  readonly trick: BotTrickKind | null;
+  /** Short HUD callout text for the active trick, or null. */
+  readonly trickLabel: string | null;
+  /** Viewport CSS px coordinates directly above the robot's chassis for its floating tag. */
+  readonly labelX: number;
+  readonly labelY: number;
+  /** Viewport CSS px center of the robot's body. */
+  readonly centerX: number;
+  readonly centerY: number;
+}
+
+export interface BotTrickTrigger {
+  readonly botIndex: number;
+  readonly name: string;
+  readonly trick: BotTrickKind;
+  readonly label: string;
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface RoamingRendererOptions {
   readonly canvas: HTMLCanvasElement;
   readonly count?: number;
+  readonly onTelemetry?: (bots: readonly BotScreenTelemetry[]) => void;
+  readonly onTrick?: (event: BotTrickTrigger) => void;
 }
 
 const FIXED_DT = 1 / 60;
@@ -60,6 +110,36 @@ const OFF_NDC_Y = 1.12;
 /** Exact NDC coordinate used when spawning just outside a viewport edge so bots trot in promptly without popping. */
 const SPAWN_NDC_X = 1.09;
 const SPAWN_NDC_Y = 1.11;
+
+const HOVER_HIT_RADIUS_PX = 58;
+const TOUCH_HIT_RADIUS_PX = 66;
+const UI_INTERACTIVE_SELECTOR =
+  "a, button, input, textarea, select, dialog[open], canvas.touch-none, [role='tab'], [role='button']";
+
+const TRICK_ORDER: readonly BotTrickKind[] = ["bow", "wiggle", "hop", "scan"];
+
+const TRICK_CONFIG: Record<
+  BotTrickKind,
+  { readonly duration: number; readonly label: string }
+> = {
+  bow: { duration: 1.65, label: "SALUTE BOW" },
+  wiggle: { duration: 1.75, label: "HAPPY WIGGLE" },
+  hop: { duration: 1.25, label: "SPRING HOP!" },
+  scan: { duration: 2.05, label: "LIDAR SCAN · ZOOM" },
+};
+
+interface ActiveTrick {
+  kind: BotTrickKind;
+  elapsed: number;
+  duration: number;
+  label: string;
+  zoomStarted: boolean;
+}
+
+function smoothstep01(edge0: number, edge1: number, x: number): number {
+  const t = clamp((x - edge0) / Math.max(1e-5, edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
 
 function normalize(
   v: readonly [number, number, number]
@@ -103,9 +183,86 @@ function shiftRobotZ(robot: Robot, dz: number): void {
   }
 }
 
+/** Evaluate smooth kinematic emote offsets for an active trick (all solved through real 4-leg FABRIK IK). */
+function evaluateTrickEmote(
+  trick: ActiveTrick,
+  out: {
+    heightOffset: number;
+    pitchOffset: number;
+    rollOffset: number;
+    footLift: number;
+  }
+): void {
+  const u = clamp(trick.elapsed / Math.max(0.01, trick.duration), 0, 1);
+  out.heightOffset = 0;
+  out.pitchOffset = 0;
+  out.rollOffset = 0;
+  out.footLift = 0;
+
+  if (trick.kind === "bow") {
+    // Smooth architectural salute bow: front shoulders lower deeply while rear stays tall
+    const enter = smoothstep01(0, 0.24, u);
+    const exit = 1 - smoothstep01(0.72, 1.0, u);
+    const env = enter * exit;
+    const breath = Math.sin(trick.elapsed * 5.2) * 0.015 * env;
+    out.heightOffset = -0.11 * env + breath;
+    out.pitchOffset = -0.34 * env;
+    return;
+  }
+
+  if (trick.kind === "wiggle") {
+    // Excited puppy-dog hip/body wiggle with all 4 FABRIK knees flexing alternately
+    const env = smoothstep01(0, 0.14, u) * (1 - smoothstep01(0.82, 1.0, u));
+    const wave = Math.sin(trick.elapsed * 22.0);
+    out.rollOffset = wave * 0.25 * env;
+    out.heightOffset = (-0.055 + Math.abs(wave) * 0.025) * env;
+    out.pitchOffset = (0.12 + Math.cos(trick.elapsed * 11.0) * 0.05) * env;
+    return;
+  }
+
+  if (trick.kind === "hop") {
+    // 3-phase spring-loaded jump: crouch anticipation -> parabolic airborne hop -> damped landing
+    if (u < 0.24) {
+      const p = Math.sin((u / 0.24) * (Math.PI * 0.5));
+      out.heightOffset = -0.13 * p;
+      out.pitchOffset = -0.12 * p;
+    } else if (u < 0.72) {
+      const p = (u - 0.24) / 0.48;
+      const arc = Math.sin(p * Math.PI);
+      const crouchRelease = Math.max(0, 1 - p * 4.0);
+      out.heightOffset = -0.13 * crouchRelease + 0.24 * arc;
+      out.footLift = 0.19 * arc;
+      out.pitchOffset = Math.sin(p * Math.PI * 2) * 0.14;
+      out.rollOffset = arc * 0.12;
+    } else {
+      const p = (u - 0.72) / 0.28;
+      const land = Math.sin(p * Math.PI);
+      out.heightOffset = -0.075 * land;
+      out.pitchOffset = -0.07 * land;
+    }
+    return;
+  }
+
+  // "scan": brief LiDAR head-up sweep followed by an energetic turbo sprint
+  if (u < 0.45) {
+    const su = u / 0.45;
+    const env = smoothstep01(0, 0.2, su) * (1 - smoothstep01(0.8, 1.0, su));
+    out.heightOffset = -0.06 * env;
+    out.pitchOffset = 0.22 * env;
+    out.rollOffset = Math.sin(trick.elapsed * 10.5) * 0.11 * env;
+  } else {
+    const zu = (u - 0.45) / 0.55;
+    const env = smoothstep01(0, 0.15, zu) * (1 - smoothstep01(0.8, 1.0, zu));
+    out.heightOffset = -0.03 * env;
+    out.pitchOffset = -0.08 * env;
+  }
+}
+
 export function createRoamingRenderer({
   canvas,
   count = 2,
+  onTelemetry,
+  onTrick,
 }: RoamingRendererOptions) {
   const botCount = clamp(Math.round(count), 1, 4);
 
@@ -127,10 +284,53 @@ export function createRoamingRenderer({
   const offscreenTime = new Float32Array(botCount);
   const respawnDelay = new Float32Array(botCount);
   const returning = new Uint8Array(botCount);
+  const nextTrickCursor = new Uint8Array(botCount);
+  const activeTricks: (ActiveTrick | null)[] = Array.from(
+    { length: botCount },
+    () => null
+  );
   const push = new Float32Array(botCount * 2);
   const shadowData = new Float32Array(botCount * 4);
+  const shadowScale = new Float32Array(botCount).fill(1);
+
+  const botMetas: RoamingBotMeta[] = Array.from({ length: botCount }, (_, i) => {
+    const preset = ROAMING_BOTS[i];
+    return preset ?? { id: i, name: `UNIT-0${i + 1}`, role: "FIELD DRONE" };
+  });
+
+  // Pre-allocated mutable telemetry objects reused every frame (zero GC pressure)
+  const telemetry: {
+    index: number;
+    name: string;
+    role: string;
+    visible: boolean;
+    hovered: boolean;
+    trick: BotTrickKind | null;
+    trickLabel: string | null;
+    labelX: number;
+    labelY: number;
+    centerX: number;
+    centerY: number;
+  }[] = botMetas.map((meta, index) => ({
+    index,
+    name: meta.name,
+    role: meta.role,
+    visible: false,
+    hovered: false,
+    trick: null,
+    trickLabel: null,
+    labelX: -200,
+    labelY: -200,
+    centerX: -200,
+    centerY: -200,
+  }));
 
   let worldZPerPixel = 0.012;
+  let hoveredBot = -1;
+  let pointerClientX = -9999;
+  let pointerClientY = -9999;
+  let pointerActive = false;
+  let pointerOverUi = false;
 
   // Telephoto 3/4 isometric viewport camera
   const orbit: OrbitRig = orbitRig({
@@ -160,6 +360,22 @@ export function createRoamingRenderer({
   const rayOrigin: Vec3 = [0, 0, 0];
   const rayDir: Vec3 = [0, 0, 0];
   const ndcOut: [number, number] = [0, 0];
+  const screenOut: [number, number] = [0, 0];
+  const scratchEmote = {
+    heightOffset: 0,
+    pitchOffset: 0,
+    rollOffset: 0,
+    footLift: 0,
+  };
+
+  function setBotHoverCursorFlag(isHovering: boolean): void {
+    if (typeof document === "undefined") return;
+    const next = isHovering ? "true" : "false";
+    if (document.documentElement.dataset.botHover !== next) {
+      document.documentElement.dataset.botHover = next;
+      window.dispatchEvent(new Event("goddev:bot-hover"));
+    }
+  }
 
   function ndcToFloor(ndcX: number, ndcY: number): [number, number] | null {
     const aspect = outputWidth / Math.max(1, outputHeight);
@@ -170,12 +386,12 @@ export function createRoamingRenderer({
     return [rayOrigin[0] + rayDir[0] * t, rayOrigin[2] + rayDir[2] * t];
   }
 
-  /** Project a floor point (x, 0, z) into exact screen NDC [-1, 1]^2 (handles perspective trapezoid exactly). */
-  function projectToNdc(x: number, z: number): [number, number] {
+  /** Project a 3D world point (x, y, z) into exact screen NDC [-1, 1]^2. */
+  function projectWorldToNdc(x: number, y: number, z: number): [number, number] {
     const m = matrices.viewProjection;
-    const cx = m[0]! * x + m[8]! * z + m[12]!;
-    const cy = m[1]! * x + m[9]! * z + m[13]!;
-    const cw = m[3]! * x + m[11]! * z + m[15]!;
+    const cx = m[0]! * x + m[4]! * y + m[8]! * z + m[12]!;
+    const cy = m[1]! * x + m[5]! * y + m[9]! * z + m[13]!;
+    const cw = m[3]! * x + m[7]! * y + m[11]! * z + m[15]!;
     if (cw <= 1e-4) {
       ndcOut[0] = 0;
       ndcOut[1] = -99;
@@ -186,16 +402,29 @@ export function createRoamingRenderer({
     return ndcOut;
   }
 
+  /** Project a 3D world point (x, y, z) into CSS viewport pixels. */
+  function projectWorldToCss(
+    x: number,
+    y: number,
+    z: number,
+    rect: DOMRect
+  ): [number, number] {
+    const [nx, ny] = projectWorldToNdc(x, y, z);
+    screenOut[0] = rect.left + (nx * 0.5 + 0.5) * rect.width;
+    screenOut[1] = rect.top + (0.5 - ny * 0.5) * rect.height;
+    return screenOut;
+  }
+
   /** How far outside the padded screen border a robot sits in NDC units (0 when visible or partially visible). */
   function offscreenNdcDistance(robot: Robot): number {
-    const [nx, ny] = projectToNdc(robot.position[0], robot.position[2]);
+    const [nx, ny] = projectWorldToNdc(robot.position[0], 0, robot.position[2]);
     const dx = Math.max(0, Math.abs(nx) - OFF_NDC_X);
     const dy = Math.max(0, Math.abs(ny) - OFF_NDC_Y);
     return Math.hypot(dx, dy);
   }
 
   function isInsideView(robot: Robot): boolean {
-    const [nx, ny] = projectToNdc(robot.position[0], robot.position[2]);
+    const [nx, ny] = projectWorldToNdc(robot.position[0], 0, robot.position[2]);
     return Math.abs(nx) <= 0.88 && Math.abs(ny) <= 0.86;
   }
 
@@ -224,13 +453,40 @@ export function createRoamingRenderer({
     }
   }
 
+  /** Find which visible robot (if any) sits under a CSS client coordinate. */
+  function hitTestBotAt(
+    clientX: number,
+    clientY: number,
+    radiusPx: number
+  ): number {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return -1;
+    let best = -1;
+    let bestDist = radiusPx;
+    for (let i = 0; i < botCount; i++) {
+      const r = robots[i]!;
+      if (offscreenNdcDistance(r) > 0.05) continue;
+      const [sx, sy] = projectWorldToCss(
+        r.position[0],
+        r.position[1] * 0.65,
+        r.position[2],
+        rect
+      );
+      const d = Math.hypot(clientX - sx, clientY - sy);
+      if (d <= bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    return best;
+  }
+
   /** Pick an organic visible floor waypoint directly in NDC space so margins are uniform at every aspect ratio. */
   function pickWaypoint(index: number): [number, number] {
     const rng = randoms[index]!;
     let nx = (mulberry32.sample(rng) * 2 - 1) * 0.78;
-    let ny = -0.76 + mulberry32.sample(rng) * 1.44; // [-0.76, +0.68] (avoids top fixed navbar)
+    let ny = -0.76 + mulberry32.sample(rng) * 1.44;
 
-    // Slightly favor left/right lanes & lower half so center headlines stay clear while bots explore freely
     if (mulberry32.sample(rng) < 0.58) {
       if (mulberry32.sample(rng) < 0.54) {
         const rightSide = mulberry32.sample(rng) < 0.5;
@@ -269,35 +525,29 @@ export function createRoamingRenderer({
     if (preferredEdge !== undefined) {
       edge = preferredEdge;
     } else {
-      // Free entry from any edge: left (32%), right (32%), bottom (20%), top (16%)
       const roll = mulberry32.sample(rng);
       edge = roll < 0.32 ? 0 : roll < 0.64 ? 1 : roll < 0.84 ? 2 : 3;
     }
 
     const sampleSpawnForEdge = (e: 0 | 1 | 2 | 3): [number, number] => {
       if (e === 0) {
-        // Left border
         const ny = -0.68 + mulberry32.sample(rng) * 1.28;
         return ndcToFloor(-SPAWN_NDC_X, ny) ?? [-7.2, 0];
       }
       if (e === 1) {
-        // Right border
         const ny = -0.68 + mulberry32.sample(rng) * 1.28;
         return ndcToFloor(SPAWN_NDC_X, ny) ?? [7.2, 0];
       }
       if (e === 2) {
-        // Bottom border
         const nx = (mulberry32.sample(rng) * 2 - 1) * 0.72;
         return ndcToFloor(nx, -SPAWN_NDC_Y) ?? [0, 5.4];
       }
-      // Top border
       const nx = (mulberry32.sample(rng) * 2 - 1) * 0.72;
       return ndcToFloor(nx, SPAWN_NDC_Y) ?? [0, -6.6];
     };
 
     let spawn = sampleSpawnForEdge(edge);
 
-    // Avoid spawning right on top of another robot
     for (let other = 0; other < botCount; other++) {
       if (other === index) continue;
       const r = robots[other]!;
@@ -308,7 +558,6 @@ export function createRoamingRenderer({
       }
     }
 
-    // Determine inward target first so the robot spawns already facing smoothly toward its destination
     let target: [number, number];
     if (forcedTarget) {
       target = [forcedTarget[0], forcedTarget[1]];
@@ -329,13 +578,15 @@ export function createRoamingRenderer({
     robot.palette = savedPalette;
     robot.phase = savedPhase;
 
+    activeTricks[index] = null;
     robot.goal[0] = target[0];
     robot.goal[1] = target[1];
     robot.arrived = false;
     returning[index] = 1;
     offscreenTime[index] = 0;
     idleTimers[index] = 1.4 + mulberry32.sample(rng) * 2.2;
-    respawnDelay[index] = (index === 0 ? 0.95 : 2.15) + mulberry32.sample(rng) * 1.1;
+    respawnDelay[index] =
+      (index === 0 ? 0.95 : 2.15) + mulberry32.sample(rng) * 1.1;
   }
 
   function spawnBots(): void {
@@ -344,8 +595,9 @@ export function createRoamingRenderer({
       const rng = randoms[i]!;
       robot.palette = i === 1 ? 1 : 0;
       robot.phase = i * 0.37;
+      // Stagger starting tricks so Bot 0 starts with Bow & Bot 1 starts with Wiggle/Hop variety
+      nextTrickCursor[i] = i % TRICK_ORDER.length;
       if (i === 0) {
-        // Start Bot 0 visibly roaming lower-left of initial section
         const start = ndcToFloor(-0.68, -0.58) ?? [-4.2, 2.8];
         const wp = pickWaypoint(i);
         const heading = Math.atan2(wp[0] - start[0], wp[1] - start[1]);
@@ -358,11 +610,55 @@ export function createRoamingRenderer({
         idleTimers[i] = 1.3 + mulberry32.sample(rng) * 1.5;
         respawnDelay[i] = 0.95 + mulberry32.sample(rng) * 0.65;
       } else {
-        // Bot 1 trots gracefully onto the screen from the right edge right after boot
         enterFromEdge(i, undefined, i % 2 === 1 ? 1 : 0);
         respawnDelay[i] = 2.0 + mulberry32.sample(rng) * 1.1;
       }
     }
+  }
+
+  function triggerBotTrick(botIndex: number): void {
+    const robot = robots[botIndex]!;
+    const meta = botMetas[botIndex]!;
+    const cursor = nextTrickCursor[botIndex]!;
+    const kind = TRICK_ORDER[cursor % TRICK_ORDER.length]!;
+    nextTrickCursor[botIndex] = (cursor + 1) % TRICK_ORDER.length;
+
+    const cfg = TRICK_CONFIG[kind];
+    activeTricks[botIndex] = {
+      kind,
+      elapsed: 0,
+      duration: cfg.duration,
+      label: cfg.label,
+      zoomStarted: false,
+    };
+
+    // Pause current wander during stationary tricks so legs bend cleanly in place
+    if (kind !== "scan") {
+      robot.goal[0] = robot.position[0];
+      robot.goal[1] = robot.position[2];
+      robot.arrived = true;
+      idleTimers[botIndex] = 0.7;
+    } else {
+      robot.goal[0] = robot.position[0];
+      robot.goal[1] = robot.position[2];
+      robot.arrived = true;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const [sx, sy] = projectWorldToCss(
+      robot.position[0],
+      0.08,
+      robot.position[2],
+      rect
+    );
+    onTrick?.({
+      botIndex,
+      name: meta.name,
+      trick: kind,
+      label: cfg.label,
+      x: sx,
+      y: sy,
+    });
   }
 
   function closestEdgeForClient(clientX: number, clientY: number): 0 | 1 | 2 | 3 {
@@ -384,12 +680,12 @@ export function createRoamingRenderer({
     const hit = clientToFloor(clientX, clientY);
     if (!hit) return;
 
-    // Prefer a bot currently visible (or right at the viewport edge)
     let nearest = -1;
     let bestDist = Infinity;
     for (let i = 0; i < botCount; i++) {
       const r = robots[i]!;
       if (offscreenNdcDistance(r) > 0.16) continue;
+      if (activeTricks[i]) continue;
       const d = Math.hypot(r.position[0] - hit[0], r.position[2] - hit[1]);
       if (d < bestDist) {
         bestDist = d;
@@ -406,26 +702,44 @@ export function createRoamingRenderer({
       return;
     }
 
-    // All bots were left behind off-screen -> immediately trot one in from the closest screen edge
-    enterFromEdge(0, hit, closestEdgeForClient(clientX, clientY));
+    // If any bot is off-screen, summon it right from the nearest edge
+    for (let i = 0; i < botCount; i++) {
+      if (offscreenNdcDistance(robots[i]!) > 0.16) {
+        enterFromEdge(i, hit, closestEdgeForClient(clientX, clientY));
+        return;
+      }
+    }
   }
 
   const onWindowPointerDown = (event: PointerEvent) => {
     if (!event.isPrimary || event.button !== 0) return;
     const target = event.target instanceof Element ? event.target : null;
-    // Ignore UI controls, links, dialogs, and interactive 3D/WebGPU stages
-    if (
-      target?.closest(
-        "a, button, input, textarea, select, dialog[open], canvas.touch-none, [role='tab'], [role='button']"
-      )
-    ) {
+    if (target?.closest(UI_INTERACTIVE_SELECTOR)) {
       return;
     }
+
+    // 1. Direct click/tap on a robot triggers its interactive FABRIK IK trick
+    const hitRadius =
+      event.pointerType === "touch" ? TOUCH_HIT_RADIUS_PX : HOVER_HIT_RADIUS_PX;
+    const hitBot = hitTestBotAt(event.clientX, event.clientY, hitRadius);
+    if (hitBot >= 0) {
+      triggerBotTrick(hitBot);
+      return;
+    }
+
+    // 2. Empty page space click summons the nearest available robot
     summonNearestBot(event.clientX, event.clientY);
   };
 
   const onWindowPointerMove = (event: PointerEvent) => {
-    if (!event.isPrimary || event.pointerType !== "mouse") return;
+    if (!event.isPrimary) return;
+    const target = event.target instanceof Element ? event.target : null;
+    pointerOverUi = Boolean(target?.closest(UI_INTERACTIVE_SELECTOR));
+    pointerClientX = event.clientX;
+    pointerClientY = event.clientY;
+    pointerActive = event.pointerType === "mouse";
+
+    if (event.pointerType !== "mouse") return;
     const now = event.timeStamp;
     if (
       lastPointerClient &&
@@ -437,13 +751,13 @@ export function createRoamingRenderer({
           event.clientX - lastPointerClient[0],
           event.clientY - lastPointerClient[1]
         ) / Math.max(8, now - lastPointerTime);
-      // If pointer whips rapidly right past a visible robot, playfully dodge aside
-      if (speed > 1.8) {
+      // Only whip-dodge when swiping VERY fast past a bot that isn't hovered/performing a trick
+      if (speed > 2.35 && hoveredBot < 0) {
         const hit = clientToFloor(event.clientX, event.clientY);
         if (hit) {
           for (let i = 0; i < botCount; i++) {
             const r = robots[i]!;
-            if (offscreenNdcDistance(r) > 0.05) continue;
+            if (activeTricks[i] || offscreenNdcDistance(r) > 0.05) continue;
             const dx = r.position[0] - hit[0];
             const dz = r.position[2] - hit[1];
             const d = Math.hypot(dx, dz);
@@ -461,6 +775,15 @@ export function createRoamingRenderer({
     }
     lastPointerClient = [event.clientX, event.clientY];
     lastPointerTime = now;
+  };
+
+  const onDocumentMouseLeave = () => {
+    pointerActive = false;
+    pointerOverUi = false;
+    if (hoveredBot !== -1) {
+      hoveredBot = -1;
+      setBotHoverCursorFlag(false);
+    }
   };
 
   function stepSimulation(): void {
@@ -493,16 +816,14 @@ export function createRoamingRenderer({
           returning[i] = 0;
           offscreenTime[i] = 0;
         } else if (offNdc > 0.55) {
-          // User scrolled briskly away while bot was still entering -> queue fresh entry after settling
           returning[i] = 0;
         }
       }
 
       if (offNdc > 0 && returning[i] === 0) {
-        // Left behind on another part of the webpage; accumulate off-screen wait
+        activeTricks[i] = null;
         const paceBoost = offNdc > 0.8 ? 1.35 : 1.0;
         offscreenTime[i] += FIXED_DT * paceBoost;
-        // Re-enter organically from any screen edge once scroll slows down
         if (offscreenTime[i]! >= respawnDelay[i]! && scrollSpeedPx < 1600) {
           enterFromEdge(i);
           continue;
@@ -511,46 +832,156 @@ export function createRoamingRenderer({
         offscreenTime[i] = 0;
       }
 
-      let steerX = 0;
-      let steerZ = 0;
-      const dx = robot.goal[0] - robot.position[0];
-      const dz = robot.goal[1] - robot.position[2];
-      const dist = Math.hypot(dx, dz);
+      // Advance active interactive trick (if any)
+      let trick = activeTricks[i];
+      let emoteArg: RobotEmote | undefined;
+      let pace = returning[i] === 1 ? 1.32 : 1.18;
+      let holdStationary = false;
 
-      if (dist < 0.24) {
-        robot.arrived = true;
-        // Only pick new visible waypoints when on-screen; left-behind bots wait naturally for edge re-entry
-        if (offNdc === 0) {
-          idleTimers[i] -= FIXED_DT;
-          if (idleTimers[i]! <= 0) {
-            const rng = randoms[i]!;
-            const next =
-              mulberry32.sample(rng) < 0.16
-                ? pickExitPoint(i)
-                : pickWaypoint(i);
-            robot.goal[0] = next[0];
-            robot.goal[1] = next[1];
-            robot.arrived = false;
-            idleTimers[i] = 1.4 + mulberry32.sample(rng) * 2.5;
+      if (trick) {
+        trick.elapsed += FIXED_DT;
+        if (trick.elapsed >= trick.duration) {
+          activeTricks[i] = null;
+          trick = null;
+          shadowScale[i] = 1;
+          // After finishing a trick, resume natural patrol shortly
+          const next = pickWaypoint(i);
+          robot.goal[0] = next[0];
+          robot.goal[1] = next[1];
+          robot.arrived = false;
+          idleTimers[i] = 1.4;
+        } else {
+          evaluateTrickEmote(trick, scratchEmote);
+          emoteArg = scratchEmote;
+          // Subtly adjust contact shadow radius as the robot jumps or bows
+          shadowScale[i] = clamp(1.0 - scratchEmote.heightOffset * 1.45, 0.65, 1.16);
+
+          if (trick.kind === "scan") {
+            const u = trick.elapsed / trick.duration;
+            if (u < 0.45) {
+              holdStationary = true;
+            } else {
+              if (!trick.zoomStarted) {
+                trick.zoomStarted = true;
+                const zoomTarget = pickWaypoint(i);
+                robot.goal[0] = zoomTarget[0];
+                robot.goal[1] = zoomTarget[1];
+                robot.arrived = false;
+              }
+              pace = 1.62;
+            }
+          } else {
+            holdStationary = true;
           }
         }
+      } else if (hoveredBot === i && offNdc === 0) {
+        // Gentle friendly attention when user hovers over the robot
+        scratchEmote.heightOffset = -0.025;
+        scratchEmote.pitchOffset = 0.11;
+        scratchEmote.rollOffset = 0;
+        scratchEmote.footLift = 0;
+        emoteArg = scratchEmote;
+        shadowScale[i] = 1.03;
+        pace = 0.3;
       } else {
-        const speedRamp = clamp(dist / 0.75, 0.35, 1.0);
-        steerX = (dx / dist) * speedRamp;
-        steerZ = (dz / dist) * speedRamp;
+        shadowScale[i] = 1;
+      }
+
+      let steerX = 0;
+      let steerZ = 0;
+
+      if (!holdStationary) {
+        const dx = robot.goal[0] - robot.position[0];
+        const dz = robot.goal[1] - robot.position[2];
+        const dist = Math.hypot(dx, dz);
+
+        if (dist < 0.24) {
+          robot.arrived = true;
+          if (offNdc === 0 && !trick) {
+            idleTimers[i] -= FIXED_DT;
+            if (idleTimers[i]! <= 0) {
+              const rng = randoms[i]!;
+              const next =
+                mulberry32.sample(rng) < 0.16
+                  ? pickExitPoint(i)
+                  : pickWaypoint(i);
+              robot.goal[0] = next[0];
+              robot.goal[1] = next[1];
+              robot.arrived = false;
+              idleTimers[i] = 1.4 + mulberry32.sample(rng) * 2.5;
+            }
+          }
+        } else {
+          const speedRamp = clamp(dist / 0.75, 0.35, 1.0);
+          steerX = (dx / dist) * speedRamp;
+          steerZ = (dz / dist) * speedRamp;
+        }
       }
 
       stepRobot(robot, {
         terrain,
         dt: FIXED_DT,
-        pace: returning[i] === 1 ? 1.32 : 1.18,
+        pace,
         steerX,
         steerZ,
-        pushX: push[i * 2]!,
-        pushZ: push[i * 2 + 1]!,
+        pushX: holdStationary ? 0 : push[i * 2]!,
+        pushZ: holdStationary ? 0 : push[i * 2 + 1]!,
         unbounded: true,
+        emote: emoteArg,
       });
     }
+  }
+
+  function updateHoverAndTelemetry(): void {
+    const rect = canvas.getBoundingClientRect();
+    const validRect = rect.width > 0 && rect.height > 0;
+
+    const nextHover =
+      validRect && pointerActive && !pointerOverUi
+        ? hitTestBotAt(pointerClientX, pointerClientY, HOVER_HIT_RADIUS_PX)
+        : -1;
+
+    if (nextHover !== hoveredBot) {
+      hoveredBot = nextHover;
+      setBotHoverCursorFlag(hoveredBot >= 0);
+    }
+
+    if (!onTelemetry) return;
+
+    for (let i = 0; i < botCount; i++) {
+      const r = robots[i]!;
+      const item = telemetry[i]!;
+      const trick = activeTricks[i];
+      const isHovered = hoveredBot === i;
+      const isVisibleOnScreen = validRect && offscreenNdcDistance(r) <= 0.04;
+      const showBadge = isVisibleOnScreen && (isHovered || Boolean(trick));
+
+      item.hovered = isHovered;
+      item.trick = trick ? trick.kind : null;
+      item.trickLabel = trick ? trick.label : null;
+      item.visible = showBadge;
+
+      if (showBadge) {
+        const [cx, cy] = projectWorldToCss(
+          r.position[0],
+          r.position[1] * 0.5,
+          r.position[2],
+          rect
+        );
+        const [lx, ly] = projectWorldToCss(
+          r.position[0],
+          r.position[1] + 0.42,
+          r.position[2],
+          rect
+        );
+        item.centerX = cx;
+        item.centerY = cy;
+        item.labelX = clamp(lx, 84, Math.max(84, rect.width - 84));
+        item.labelY = clamp(ly - 14, 78, Math.max(78, rect.height - 44));
+      }
+    }
+
+    onTelemetry(telemetry);
   }
 
   let rig: ReturnType<typeof createRig> | undefined;
@@ -647,7 +1078,7 @@ export function createRoamingRenderer({
       shadowData[i * 4] = r.position[0];
       shadowData[i * 4 + 1] = r.position[2];
       shadowData[i * 4 + 2] = r.heading.value;
-      shadowData[i * 4 + 3] = 1.0;
+      shadowData[i * 4 + 3] = shadowScale[i]!;
     }
     shadowGeo.write(shadowData);
 
@@ -678,6 +1109,7 @@ export function createRoamingRenderer({
       return;
     }
 
+    updateHoverAndTelemetry();
     rafId = requestAnimationFrame(tick);
   };
 
@@ -699,10 +1131,12 @@ export function createRoamingRenderer({
     if (disposed) return;
     disposed = true;
     stopLoop();
+    setBotHoverCursorFlag(false);
     unsubscribeResize?.();
     if (typeof window !== "undefined") {
       window.removeEventListener("pointerdown", onWindowPointerDown);
       window.removeEventListener("pointermove", onWindowPointerMove);
+      document.removeEventListener("mouseleave", onDocumentMouseLeave);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     }
     gpu?.dispose();
@@ -794,6 +1228,7 @@ export function createRoamingRenderer({
     window.addEventListener("pointermove", onWindowPointerMove, {
       passive: true,
     });
+    document.addEventListener("mouseleave", onDocumentMouseLeave);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     started = true;

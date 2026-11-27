@@ -292,12 +292,24 @@ export function toBody(out: Vec3, robot: Robot, world: Vec3): Vec3 {
   return vec3.transformQuat(out, out, inverse);
 }
 
-function solveLegs(robot: Robot): void {
+function solveLegs(robot: Robot, footLift = 0): void {
   for (let leg = 0; leg < LEG_COUNT; leg++) {
     const target = robot.targets[leg]!;
     toBody(target, robot, robot.feet[leg]!.position);
+    if (footLift !== 0) target[1] += footLift;
     solveLeg(robot.legs[leg]!, target);
   }
+}
+
+export interface RobotEmote {
+  /** Additive body height offset in world units (negative = crouch/bow, positive = hop). */
+  readonly heightOffset?: number;
+  /** Additive body pitch gradient (negative = front dips to bow, positive = head tilts up). */
+  readonly pitchOffset?: number;
+  /** Additive body roll gradient (oscillating = playful puppy wiggle). */
+  readonly rollOffset?: number;
+  /** Body-space upward lift applied to solved foot targets during an airborne spring hop. */
+  readonly footLift?: number;
 }
 
 export interface StepContext {
@@ -313,6 +325,8 @@ export interface StepContext {
   readonly pushZ?: number;
   /** Allow walking outside the [-HALF, HALF] sculptable tile (used by free-roaming page bots). */
   readonly unbounded?: boolean;
+  /** Optional additive kinematic emote pose solved through all 4 FABRIK IK legs. */
+  readonly emote?: RobotEmote;
 }
 
 const local: Vec3 = [0, 0, 0];
@@ -410,7 +424,22 @@ export function stepRobot(robot: Robot, context: StepContext): void {
   // --- Body pose from the planted feet.
   fitBody(robot, dt, swinging);
 
-  solveLegs(robot);
+  const emote = context.emote;
+  if (emote) {
+    if (emote.heightOffset) {
+      robot.position[1] = Math.max(0.28, robot.position[1] + emote.heightOffset);
+    }
+    if (emote.rollOffset || emote.pitchOffset) {
+      setRotation(
+        robot,
+        robot.heading.value,
+        robot.slopeRight.value + (emote.rollOffset ?? 0),
+        robot.slopeForward.value + (emote.pitchOffset ?? 0)
+      );
+    }
+  }
+
+  solveLegs(robot, emote?.footLift ?? 0);
   for (let leg = 0; leg < LEG_COUNT; leg++) {
     if (robot.feet[leg]!.planted && robot.legs[leg]!.error > 0.01) robot.slipped++;
   }
