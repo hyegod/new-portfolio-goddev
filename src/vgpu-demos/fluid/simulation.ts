@@ -192,8 +192,13 @@ function inputUniforms(fluid: Fluid, input?: StirInput) {
     pointer_from: input?.from ?? [0.5, 0.5],
     pointer_to: input?.to ?? [0.5, 0.5],
     pointer_velocity: pointerVelocity,
-    // Like the reference, splat color comes from movement direction, with blue held high.
-    pointer_color: [0.5 + 0.5 * direction[0]!, 0.5 + 0.5 * direction[1]!, 1, 1],
+    // GODDEV dye channels: R = deep architectural ink, G = survey ice highlight, B = Electric Cobalt.
+    pointer_color: [
+      0.22 + 0.52 * Math.abs(direction[0]!),
+      0.32 + 0.52 * (0.5 + 0.5 * direction[1]!),
+      1,
+      1,
+    ],
     idle_a: [...a, ramp * idle, 0.006],
     idle_b: [...b, ramp * idle, 0.0055],
   };

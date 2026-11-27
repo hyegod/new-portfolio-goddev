@@ -37,8 +37,8 @@ import terrainShader from "./terrain.wgsl";
 
 export const LENS: Lens = { fov: 35, near: 0.05, far: 100 };
 export const SHADOW_SIZE = 2048;
-/** Display-encoded clear colour (the neutral gray backdrop); matches backgroundColor(0) in common.wgsl. */
-export const CLEAR_COLOR = [0.5, 0.505, 0.51] as const;
+/** Display-encoded clear colour matching bright exposed concrete #ECEEF0 in common.wgsl. */
+export const CLEAR_COLOR = [0.916, 0.925, 0.937] as const;
 const SUN_DIRECTION = normalize([-0.45, 0.8, 0.35]);
 const SUN_DISTANCE = 30;
 const SUN_HALF_EXTENT = 11.5;
@@ -152,10 +152,10 @@ export function createPipeline(gpu: Gpu, colony: Colony, size: readonly [number,
   const sceneValues = {
     lightViewProjection: sunViewProjection(),
     sunDirection: SUN_DIRECTION,
-    exposure: 1.05,
-    sunColor: [2.7, 2.45, 2.1],
+    exposure: 1.08,
+    sunColor: [2.8, 2.86, 2.96],
     time: 0,
-    skyColor: [0.32, 0.36, 0.42],
+    skyColor: [0.56, 0.62, 0.72],
     contactCount: 0,
     brush: [0, 0, 1, 0],
     destination: [0, 0, 0, 0],
@@ -340,16 +340,16 @@ function meshGeometry(gpu: Gpu, mesh: MeshData): Geometry {
   });
 }
 
-// Debug colours (display sRGB) and widths in CSS px.
+// CAD technical debug colours (display sRGB) and widths in CSS px matching GODDEV palette.
 const DEBUG = {
-  hip: [0.95, 0.95, 0.95, 4.5],
-  femur: [1, 0.85, 0.15, 5],
-  tibia: [0.2, 0.85, 1, 4.5],
-  target: [1, 0.25, 0.85, 7],
-  planted: [0.3, 1, 0.35, 8],
-  lifted: [0.55, 0.55, 0.55, 6],
-  landing: [1, 0.55, 0.1, 7],
-  heading: [1, 0.2, 0.15, 3],
+  hip: [0.06, 0.07, 0.1, 4.5],
+  femur: [0.0, 0.22, 1.0, 5],
+  tibia: [0.34, 0.56, 1.0, 4.5],
+  target: [0.0, 0.22, 1.0, 7],
+  planted: [0.08, 0.68, 0.46, 7.5],
+  lifted: [0.38, 0.42, 0.5, 5.5],
+  landing: [0.22, 0.45, 1.0, 6.5],
+  heading: [0.0, 0.22, 1.0, 3.5],
 } as const;
 
 const worldA: Vec3 = [0, 0, 0];

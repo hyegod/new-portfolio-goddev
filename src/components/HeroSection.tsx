@@ -4,13 +4,14 @@ import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { PORTFOLIO_PROFILE } from "@/data/portfolio";
-import { usePerformanceProfile } from "@/lib/devicePerf";
+import { useInViewport, usePerformanceProfile } from "@/lib/devicePerf";
 import {
   generatePresetPointCloud,
   type PointCloudData,
 } from "@/lib/pointCloudGenerator";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
 import { ConcreteCracks, HeroSprayArtwork } from "./SprayArtworks";
+import { LazyInteractiveFluidShowcase } from "./VgpuShowcases";
 
 const GHOST_LINES = [
   "STATIC PLANS",
@@ -27,6 +28,7 @@ export function HeroSection() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const tapResetRef = useRef<number>(0);
+  const isHeroInView = useInViewport(sectionRef, "220px 0px");
 
   // Zero-rerender spring parallax planes (back ghost text / mid cobalt spray / front GO HARD)
   const rawX = useMotionValue(0);
@@ -135,13 +137,21 @@ export function HeroSection() {
       onClick={handleHeroClick}
       className="relative flex min-h-[100svh] flex-col justify-between overflow-hidden border-b border-black/12 px-3 pt-[74px] pb-4 min-[380px]:px-4 min-[380px]:pt-[84px] sm:px-8 sm:pb-5 lg:px-12"
     >
-      {/* Architectural Concrete Crack Accents */}
-      <ConcreteCracks className="absolute top-12 left-0 h-[260px] w-[220px] opacity-85 sm:h-[360px] sm:w-[300px]" />
-
-      {/* Subtle Ambient Interactive 3D Cable-Stayed Bridge Point-Cloud in Light Blueprint Mode */}
+      {/* Layer 0: Ambient Interactive Navier-Stokes Concrete × Cobalt Fluid (reacts to pointer without blocking UI/scroll) */}
       <div
-        className={`pointer-events-none absolute inset-0 z-0 transition-opacity duration-700 ${
-          heroCloud ? "opacity-52" : "opacity-0"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 opacity-75"
+      >
+        {isHeroInView && <LazyInteractiveFluidShowcase ambient />}
+      </div>
+
+      {/* Architectural Concrete Crack Accents */}
+      <ConcreteCracks className="pointer-events-none absolute top-12 left-0 z-[1] h-[260px] w-[220px] opacity-80 sm:h-[360px] sm:w-[300px]" />
+
+      {/* Layer 1: 3D Cable-Stayed Bridge Point-Cloud blended seamlessly over Interactive Fluid */}
+      <div
+        className={`pointer-events-none absolute inset-0 z-[1] mix-blend-multiply transition-opacity duration-700 ${
+          heroCloud ? "opacity-55" : "opacity-0"
         }`}
       >
         {heroCloud && perf && (

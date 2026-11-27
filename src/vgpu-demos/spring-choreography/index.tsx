@@ -102,10 +102,10 @@ export function SpringChoreographyShowcase({
                   rendererRef.current?.jumpTo(idx);
                 }}
                 aria-pressed={active}
-                className={`rounded-lg border px-2.5 py-1 font-mono text-[9px] font-semibold tracking-[0.14em] uppercase backdrop-blur-md transition-colors ${
+                className={`rounded-xl px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.14em] uppercase transition-colors ${
                   active
-                    ? "border-[#5B86FF] bg-[#0038FF]/35 text-white"
-                    : "border-white/14 bg-black/50 text-white/65 hover:border-white/35 hover:text-white"
+                    ? "border border-[#5B86FF] bg-[#0038FF] text-white shadow-[0_6px_16px_-4px_rgba(0,56,255,0.5)]"
+                    : "glass-pill-dark text-white/75 hover:border-[#5B86FF] hover:text-white"
                 }`}
               >
                 {shape.label}
@@ -115,9 +115,9 @@ export function SpringChoreographyShowcase({
           <button
             type="button"
             onClick={() => rendererRef.current?.burst()}
-            className="inline-flex items-center gap-1 rounded-lg border border-white/18 bg-black/55 px-2.5 py-1 font-mono text-[9px] font-semibold tracking-[0.14em] text-[#8AB4FF] uppercase backdrop-blur-md transition-colors hover:border-[#0038FF] hover:bg-[#0038FF] hover:text-white"
+            className="glass-pill-dark inline-flex items-center gap-1 rounded-xl px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.14em] text-[#8AB4FF] uppercase transition-colors hover:border-[#0038FF] hover:bg-[#0038FF] hover:text-white"
           >
-            <Sparkles className="h-2.5 w-2.5" />
+            <Sparkles className="h-3 w-3" />
             <span>BURST</span>
           </button>
         </div>

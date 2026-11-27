@@ -57,15 +57,17 @@ export function MechanicalGardenShowcase({
   if (status === "fallback") {
     return (
       <div
-        className={`relative h-full w-full overflow-hidden bg-[#0A0C12] ${className}`}
+        className={`relative h-full w-full overflow-hidden bg-[#ECEEF0] ${className}`}
       >
         <LazyVgpuCanvas
           shaderId="particles-ocean"
           forceWebgl
+          paperLight
           maxDpr={1.4}
-          ariaLabel="Interactive wave surface field (WebGL2 mobile compatibility mode)"
+          ariaLabel="Interactive concrete wave terrain field (WebGL2 mobile compatibility mode)"
         />
-        <div className="pointer-events-none absolute top-3 left-3 z-10 rounded-full border border-white/15 bg-black/55 px-3 py-1 font-mono text-[9px] tracking-[0.16em] text-emerald-200 uppercase backdrop-blur-md">
+        <div className="glass-pill-light pointer-events-none absolute top-3 left-3 z-10 rounded-full px-3 py-1 font-mono text-[9px] font-semibold tracking-[0.16em] text-[#0D0E12] uppercase">
+          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#0038FF] align-middle" />
           WEBGL2 COMPAT · DRAG TO ORBIT
         </div>
       </div>
@@ -75,7 +77,7 @@ export function MechanicalGardenShowcase({
   return (
     <div
       ref={rootRef}
-      className={`relative h-full w-full overflow-hidden bg-[#8D9096] ${className}`}
+      className={`relative h-full w-full overflow-hidden bg-[#ECEEF0] ${className}`}
     >
       <canvas
         ref={canvasRef}
@@ -96,10 +98,10 @@ export function MechanicalGardenShowcase({
               setIkDebug(next);
             }}
             aria-pressed={ikDebug}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[9px] font-semibold tracking-[0.14em] uppercase backdrop-blur-md transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.14em] uppercase transition-colors ${
               ikDebug
-                ? "border-[#5B86FF] bg-[#0038FF] text-white"
-                : "border-white/15 bg-[#0D0E12]/80 text-white/85 hover:border-[#0038FF]"
+                ? "border border-[#0038FF] bg-[#0038FF] text-white shadow-[0_6px_16px_-4px_rgba(0,56,255,0.45)]"
+                : "glass-pill-light text-[#0D0E12] hover:border-[#0038FF] hover:text-[#0038FF]"
             }`}
           >
             <Cpu className="h-3 w-3" />
@@ -109,7 +111,7 @@ export function MechanicalGardenShowcase({
           <button
             type="button"
             onClick={() => rendererRef.current?.resetTerrain()}
-            className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-[#0D0E12]/80 px-2.5 py-1.5 font-mono text-[9px] font-semibold tracking-[0.14em] text-white/85 uppercase backdrop-blur-md transition-colors hover:border-[#0038FF] hover:bg-[#0038FF] hover:text-white"
+            className="glass-pill-light inline-flex items-center gap-1 rounded-xl px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.14em] text-[#0D0E12] uppercase transition-colors hover:border-[#0038FF] hover:bg-[#0038FF] hover:text-white"
           >
             <RotateCcw className="h-3 w-3" />
             <span>RESET</span>

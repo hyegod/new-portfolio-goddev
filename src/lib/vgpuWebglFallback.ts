@@ -20,6 +20,7 @@ export interface WebglFallbackOptions {
   canvas: HTMLCanvasElement;
   shaderId: VgpuShaderId;
   ambient: boolean;
+  paperLight?: boolean;
   maxDpr: number;
   reducedMotion: boolean;
   ptr: VgpuPointerState;
@@ -266,6 +267,7 @@ void main() {
 const FRAG_FLUID_DISPLAY = `${PRECISION_HEADER}
 varying vec2 vFboUv;
 uniform vec4 uTimeRes;
+uniform float uPaperLight;
 uniform sampler2D uFluidTex;
 
 const float VEL_ZERO = 128.0 / 255.0;
@@ -289,6 +291,35 @@ void main() {
   float spec = pow(max(0.0, dot(normal, normalize(vec3(0.35, 0.55, 0.75)))), 18.0);
 
   float speed = length((c.rg - VEL_ZERO) * 2.4);
+
+  if (uPaperLight > 0.5) {
+    // Bright Exposed Concrete (#ECEEF0) drafting surface + Electric Cobalt & Ink streamlines
+    vec3 paper = mix(
+      vec3(0.952, 0.958, 0.966),
+      vec3(0.916, 0.925, 0.937),
+      smoothstep(0.05, 0.95, length(vFboUv - 0.5) * 1.35)
+    );
+    vec2 gridUv = fract(gl_FragCoord.xy / 40.0);
+    float gridLine = max(step(gridUv.x, 0.025), step(gridUv.y, 0.025));
+    paper = mix(paper, vec3(0.835, 0.855, 0.895), gridLine * 0.36);
+
+    float amount = 1.0 - exp(-density * 1.35);
+    vec3 electricCobalt = vec3(0.0, 0.22, 1.0);
+    vec3 surveyIce = vec3(0.30, 0.54, 1.0);
+    vec3 deepInk = vec3(0.045, 0.068, 0.16);
+
+    vec3 pigment = mix(electricCobalt, surveyIce, smoothstep(0.15, 0.95, cA / max(density, 0.01)) * 0.52);
+    pigment = mix(pigment, deepInk, smoothstep(0.28, 0.92, speed * 0.65 + cB * 0.45) * 0.68);
+
+    float contour = abs(fract(density * 3.2) - 0.5);
+    float line = smoothstep(0.036, 0.01, contour) * smoothstep(0.18, 0.72, amount);
+
+    vec3 col = mix(paper, pigment, smoothstep(0.02, 0.86, amount) * 0.92);
+    col = mix(col, vec3(0.68, 0.82, 1.0), spec * 0.32 * amount);
+    col = mix(col, vec3(0.96, 0.98, 1.0), line * 0.24);
+    gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    return;
+  }
 
   vec3 obsidian = vec3(0.022, 0.028, 0.045);
   vec3 cobalt = vec3(0.0, 0.24, 1.0);
@@ -429,6 +460,7 @@ varying vec2 vUv;
 uniform vec4 uTimeRes;
 uniform vec4 uPointer;
 uniform vec4 uControl;
+uniform float uPaperLight;
 
 float hash21(vec2 p) {
   vec2 p2 = fract(p * vec2(123.34, 456.21));
@@ -472,10 +504,12 @@ void main() {
   vec3 ro = vec3(0.0, 2.35, -t * 0.85);
 
   float horizonGlow = exp(-abs(rd.y) * 7.5);
-  vec3 skyCol = mix(vec3(0.018, 0.024, 0.042), vec3(0.04, 0.18, 0.58), horizonGlow * 0.65);
+  vec3 skyCol = uPaperLight > 0.5
+    ? mix(vec3(0.925, 0.933, 0.941), vec3(0.86, 0.89, 0.96), horizonGlow * 0.55)
+    : mix(vec3(0.018, 0.024, 0.042), vec3(0.04, 0.18, 0.58), horizonGlow * 0.65);
   vec3 col = skyCol;
 
-  if (rd.y > 0.01) {
+  if (rd.y > 0.01 && uPaperLight < 0.5) {
     vec2 starCell = floor(rd.xz / max(0.08, rd.y) * 32.0);
     float st = hash21(starCell);
     if (st > 0.992) {
@@ -485,6 +519,8 @@ void main() {
 
   if (rd.y < -0.008) {
     vec3 accum = vec3(0.0);
+    float inkAccum = 0.0;
+    float crestAccum = 0.0;
     float dist = 1.6;
     for (int s = 0; s < 30; s++) {
       vec3 pos = ro + rd * dist;
@@ -503,12 +539,16 @@ void main() {
         float crest = smoothstep(-0.22, 0.42, wh);
         float sparkle = smoothstep(0.16, 0.02, dDot) * exp(-abs(diff) * 14.0);
 
-        vec3 deepCobalt = vec3(0.02, 0.26, 1.0);
-        vec3 crestIce = vec3(0.56, 0.82, 1.0);
-        vec3 bone = vec3(0.95, 0.98, 1.0);
-
-        vec3 pCol = mix(deepCobalt, mix(crestIce, bone, crest * 0.65), crest);
-        accum += pCol * sparkle * fade * (1.25 + crest * 1.4);
+        if (uPaperLight > 0.5) {
+          inkAccum += sparkle * fade * (1.35 + crest * 1.1);
+          crestAccum += sparkle * fade * crest;
+        } else {
+          vec3 deepCobalt = vec3(0.02, 0.26, 1.0);
+          vec3 crestIce = vec3(0.56, 0.82, 1.0);
+          vec3 bone = vec3(0.95, 0.98, 1.0);
+          vec3 pCol = mix(deepCobalt, mix(crestIce, bone, crest * 0.65), crest);
+          accum += pCol * sparkle * fade * (1.25 + crest * 1.4);
+        }
       }
 
       if (diff < -0.24) break;
@@ -523,12 +563,22 @@ void main() {
     float hz = waveHeight(seaPos.xz + vec2(0.0, 0.12), t);
     vec3 n = normalize(vec3(h0 - hx, 0.12, h0 - hz));
     float fresnel = pow(1.0 - max(0.0, dot(n, -rd)), 4.0);
-    vec3 surfaceTint = vec3(0.02, 0.12, 0.42) * fresnel * exp(-seaDist * 0.045);
 
+    if (uPaperLight > 0.5) {
+      vec3 concreteFloor = mix(vec3(0.895, 0.905, 0.92), vec3(0.82, 0.86, 0.94), fresnel * 0.45);
+      float inkAlpha = clamp(inkAccum * 0.72, 0.0, 0.94);
+      vec3 dotColor = mix(vec3(0.05, 0.08, 0.18), vec3(0.0, 0.22, 1.0), clamp(crestAccum * 1.4, 0.0, 1.0));
+      vec3 lightSurface = mix(concreteFloor, dotColor, inkAlpha);
+      col = mix(col, lightSurface, smoothstep(-0.008, -0.08, rd.y));
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+      return;
+    }
+
+    vec3 surfaceTint = vec3(0.02, 0.12, 0.42) * fresnel * exp(-seaDist * 0.045);
     col = mix(col, surfaceTint + accum * 0.72, smoothstep(-0.008, -0.08, rd.y));
   }
 
-  gl_FragColor = vec4(tonemapACES(col), 1.0);
+  gl_FragColor = vec4(uPaperLight > 0.5 ? clamp(col, 0.0, 1.0) : tonemapACES(col), 1.0);
 }
 `;
 
@@ -627,10 +677,10 @@ void main() {
         float doppler = clamp(dot(tangent, rd) * 0.5 + 0.5, 0.0, 1.0);
         float beam = 0.48 + 1.35 * doppler * doppler;
 
-        vec3 hotCobalt = vec3(0.24, 0.58, 1.0);
-        vec3 coreWhite = vec3(0.96, 0.98, 1.0);
-        vec3 coolAmber = vec3(0.95, 0.58, 0.24);
-        vec3 diskCol = mix(coolAmber, mix(hotCobalt, coreWhite, doppler * 0.72), smoothstep(0.15, 0.85, doppler));
+        vec3 hotSilver = vec3(0.84, 0.87, 0.92);
+        vec3 coreWhite = vec3(0.98, 0.99, 1.0);
+        vec3 dimSilver = vec3(0.36, 0.39, 0.45);
+        vec3 diskCol = mix(dimSilver, mix(hotSilver, coreWhite, doppler * 0.76), smoothstep(0.12, 0.88, doppler));
 
         float density = radialEnv * thinness * (0.35 + swirl * 0.85) * rings * stepSize * 1.45;
         accum += diskCol * beam * density * transmittance;
@@ -639,7 +689,7 @@ void main() {
     }
 
     float photonGlow = exp(-abs(r - 1.56) * 14.0) * stepSize * 0.34;
-    accum += vec3(0.28, 0.58, 1.0) * photonGlow * transmittance;
+    accum += vec3(0.85, 0.88, 0.94) * photonGlow * transmittance;
 
     pos = nextPos;
   }
@@ -835,6 +885,7 @@ export function startWebglShaderFallback(
     canvas,
     shaderId,
     ambient,
+    paperLight = false,
     maxDpr,
     reducedMotion,
     ptr,
@@ -1040,6 +1091,7 @@ export function startWebglShaderFallback(
   const dispLocs = dispProg
     ? {
         timeRes: gl.getUniformLocation(dispProg, "uTimeRes"),
+        paperLight: gl.getUniformLocation(dispProg, "uPaperLight"),
         fluidTex: gl.getUniformLocation(dispProg, "uFluidTex"),
       }
     : null;
@@ -1048,6 +1100,7 @@ export function startWebglShaderFallback(
         timeRes: gl.getUniformLocation(mainProg, "uTimeRes"),
         pointer: gl.getUniformLocation(mainProg, "uPointer"),
         control: gl.getUniformLocation(mainProg, "uControl"),
+        paperLight: gl.getUniformLocation(mainProg, "uPaperLight"),
         videoTex: gl.getUniformLocation(mainProg, "uVideoTex"),
       }
     : null;
@@ -1116,6 +1169,9 @@ export function startWebglShaderFallback(
       gl.bindTexture(gl.TEXTURE_2D, ppTex[readIdx]);
       gl.uniform1i(dispLocs.fluidTex, 0);
       gl.uniform4f(dispLocs.timeRes, elapsed, width, height, aspect);
+      if (dispLocs.paperLight) {
+        gl.uniform1f(dispLocs.paperLight, paperLight ? 1.0 : 0.0);
+      }
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       return;
     }
@@ -1162,6 +1218,9 @@ export function startWebglShaderFallback(
         ptr.orbitY,
         ptr.pressed ? 1.0 : 0.0
       );
+      if (mainLocs.paperLight) {
+        gl.uniform1f(mainLocs.paperLight, paperLight ? 1.0 : 0.0);
+      }
       if (shaderId === "video-texture" && mainLocs.videoTex && videoTex) {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, videoTex);

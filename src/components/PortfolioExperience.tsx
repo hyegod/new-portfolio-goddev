@@ -207,22 +207,24 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
 
         // --- E. SLOGAN: COBALT INFINITY PARALLAX + COUNTER-DRIFTING "ENDLESS / NO LIMIT" ---
         if (rootEl.querySelector("#slogan")) {
-          gsap.fromTo(
-            ".manifesto-infinity",
-            { y: 34, scale: 0.92, rotate: -3.5 },
-            {
-              y: -44,
-              scale: 1.07,
-              rotate: 2.5,
-              ease: "none",
-              scrollTrigger: {
-                trigger: "#slogan",
-                start: "top bottom",
-                end: "bottom top",
-                scrub: 1.1,
-              },
-            }
-          );
+          if (rootEl.querySelector(".manifesto-infinity")) {
+            gsap.fromTo(
+              ".manifesto-infinity",
+              { y: 34, scale: 0.92, rotate: -3.5 },
+              {
+                y: -44,
+                scale: 1.07,
+                rotate: 2.5,
+                ease: "none",
+                scrollTrigger: {
+                  trigger: "#slogan",
+                  start: "top bottom",
+                  end: "bottom top",
+                  scrub: 1.1,
+                },
+              }
+            );
+          }
 
           gsap.fromTo(
             ".slogan-word-left",

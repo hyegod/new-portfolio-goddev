@@ -28,13 +28,13 @@ fn vs_main(@location(0) position: vec3f) -> FloorVarying {
 fn fs_main(input: FloorVarying) -> @location(0) vec4f {
   let p = input.worldPosition;
   let n = vec3f(0.0, 1.0, 0.0);
-  // Contact shade hugging the plinth's foot.
+  // Contact shade hugging the plinth's foot on bright concrete studio cyclorama.
   let outside = max(abs(p.x), abs(p.z)) - HALF;
-  let contact = mix(0.35, 1.0, saturate(outside / 1.2));
-  let surface = Surface(vec3f(0.2, 0.2, 0.2), vec3f(0.03), 14.0, contact, vec3f(0.0));
+  let contact = mix(0.55, 1.0, saturate(outside / 1.4));
+  let surface = Surface(vec3f(0.68, 0.70, 0.73), vec3f(0.025), 14.0, contact, vec3f(0.0));
   let viewDirection = normalize(camera.eye - p);
   let shadow = sunShadow(shadowMap, shadowSampler, scene.lightViewProjection, p, n);
   let lit = finish(lightSurface(surface, n, viewDirection, scene.sunDirection, scene.sunColor, scene.skyColor, shadow), scene.exposure);
-  let fade = smoothstep(HALF + 1.0, HALF + 14.0, length(p.xz));
+  let fade = smoothstep(HALF + 0.8, HALF + 11.0, length(p.xz));
   return vec4f(mix(lit.rgb, backgroundColor(0.0), fade), 1.0);
 }

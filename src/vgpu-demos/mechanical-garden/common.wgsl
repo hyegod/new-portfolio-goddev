@@ -30,8 +30,8 @@ export struct Scene {
 }
 
 export fn backgroundColor(height: f32) -> vec3f {
-  // Display-encoded neutral gray backdrop (the scene target stores tone-mapped sRGB).
-  return mix(vec3f(0.5, 0.505, 0.51), vec3f(0.66, 0.665, 0.67), saturate(height));
+  // Bright architectural exposed-concrete backdrop matching portfolio #ECEEF0.
+  return mix(vec3f(0.916, 0.925, 0.937), vec3f(0.955, 0.962, 0.972), saturate(height));
 }
 
 // Material codes carried per vertex; keep in sync with MATERIAL in meshes.ts.
@@ -71,10 +71,10 @@ export fn sunShadow(
   return lit / 9.0;
 }
 
-/** Studio light: a neutral sky dome above and a gray bounce off the concrete below. */
+/** Studio light: crisp architectural sky dome above and bright concrete bounce below. */
 export fn ambient(normal: vec3f, sky: vec3f) -> vec3f {
   let up = normal.y * 0.5 + 0.5;
-  return mix(vec3f(0.14, 0.14, 0.14), sky, up);
+  return mix(vec3f(0.32, 0.34, 0.37), sky, up);
 }
 
 /** Surface response: diffuse plus a Blinn-Phong lobe with Schlick fresnel. */

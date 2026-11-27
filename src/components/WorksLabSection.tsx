@@ -686,21 +686,21 @@ export function WorksLabSection({
           <div
             role="tablist"
             aria-label="Interactive canvas engine"
-            className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-xl border border-black/12 bg-white/80 p-1 shadow-[0_8px_20px_-12px_rgba(13,14,18,0.14)] backdrop-blur-md"
+            className="grid w-full grid-cols-2 items-center gap-1 rounded-xl border border-black/12 bg-white/80 p-1 shadow-[0_8px_20px_-12px_rgba(13,14,18,0.14)] backdrop-blur-md sm:inline-flex sm:w-auto"
           >
             <button
               type="button"
               role="tab"
               aria-selected={studioMode === "lidar"}
               onClick={() => setStudioMode("lidar")}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.14em] uppercase transition-colors sm:px-3.5 sm:text-[10px] sm:tracking-[0.16em] ${
+              className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-lg px-2 py-1.5 whitespace-nowrap font-mono text-[8.5px] font-semibold tracking-[0.08em] uppercase transition-colors min-[380px]:gap-1.5 min-[380px]:text-[9px] min-[380px]:tracking-[0.12em] sm:px-3.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 studioMode === "lidar"
                   ? "bg-[#0D0E12] text-white shadow-xs"
                   : "text-[#505562] hover:text-[#0D0E12]"
               }`}
             >
               <Sparkles className="h-3 w-3 shrink-0" />
-              <span className="text-trim">3D LIDAR · WEBGL</span>
+              <span className="text-trim truncate">3D LIDAR · WEBGL</span>
             </button>
 
             <button
@@ -708,16 +708,16 @@ export function WorksLabSection({
               role="tab"
               aria-selected={studioMode === "webgpu"}
               onClick={() => setStudioMode("webgpu")}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.14em] uppercase transition-colors sm:px-3.5 sm:text-[10px] sm:tracking-[0.16em] ${
+              className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-lg px-2 py-1.5 whitespace-nowrap font-mono text-[8.5px] font-semibold tracking-[0.08em] uppercase transition-colors min-[380px]:gap-1.5 min-[380px]:text-[9px] min-[380px]:tracking-[0.12em] sm:px-3.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 studioMode === "webgpu"
                   ? "bg-[#0038FF] text-white shadow-xs"
                   : "text-[#505562] hover:text-[#0038FF]"
               }`}
             >
               <Cpu className="h-3 w-3 shrink-0" />
-              <span className="text-trim">WEBGPU LAB · VGPU</span>
+              <span className="text-trim truncate">WEBGPU LAB</span>
               <span
-                className={`rounded px-1.5 py-0.5 text-[8.5px] leading-none tracking-[0.12em] ${
+                className={`hidden shrink-0 rounded px-1 py-0.5 text-[8px] leading-none tracking-[0.1em] min-[360px]:inline sm:px-1.5 sm:text-[8.5px] ${
                   studioMode === "webgpu"
                     ? "bg-white/20 text-white"
                     : "bg-[#0038FF]/12 text-[#0038FF]"

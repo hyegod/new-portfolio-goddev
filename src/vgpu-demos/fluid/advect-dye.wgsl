@@ -41,8 +41,8 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let backtrace = clamp(p - sample_velocity(p) / 60.0, 0.5 / vec2f(grid.dye_size), 1.0 - 0.5 / vec2f(grid.dye_size));
   var color = 0.97 * sample_dye(backtrace);
 
-  color += vec4f(0.05, 0.48, 1.0, 1.0) * emitter_weight(p, input.idle_a, aspect) * 0.12;
-  color += vec4f(1.0, 0.08, 0.55, 1.0) * emitter_weight(p, input.idle_b, aspect) * 0.115;
+  color += vec4f(0.14, 0.45, 1.0, 1.0) * emitter_weight(p, input.idle_a, aspect) * 0.13;
+  color += vec4f(0.82, 0.24, 0.68, 1.0) * emitter_weight(p, input.idle_b, aspect) * 0.12;
   if (input.pointer_active > 0.0) {
     let weight = segment_weight(p, input.pointer_from, input.pointer_to, 0.002, aspect);
     color += input.pointer_color * weight * 0.35;

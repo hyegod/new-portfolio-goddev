@@ -36,6 +36,7 @@ export interface VgpuCanvasProps {
   paused?: boolean;
   maxDpr?: number;
   forceWebgl?: boolean;
+  paperLight?: boolean;
   videoElement?: HTMLVideoElement | null;
   onStatusChange?: (status: VgpuStatus) => void;
   className?: string;
@@ -140,6 +141,7 @@ export function VgpuCanvas({
   paused = false,
   maxDpr = 2,
   forceWebgl = false,
+  paperLight = false,
   videoElement = null,
   onStatusChange,
   className = "",
@@ -294,6 +296,7 @@ export function VgpuCanvas({
           canvas,
           shaderId,
           ambient,
+          paperLight,
           maxDpr,
           reducedMotion,
           ptr,
@@ -622,7 +625,7 @@ export function VgpuCanvas({
       gpu?.dispose();
       webglHandle?.dispose();
     };
-  }, [shaderId, ambient, maxDpr, engineMode]);
+  }, [shaderId, ambient, paperLight, maxDpr, engineMode]);
 
   const isLive = status === "webgpu" || status === "webgl";
 

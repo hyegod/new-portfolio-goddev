@@ -118,7 +118,7 @@ export function AboutSection() {
             </span>
           </div>
 
-          <div className="anim-stage-reveal relative h-[440px] w-full overflow-hidden rounded-2xl border border-black/18 bg-[#8D9096] shadow-[0_24px_54px_-18px_rgba(13,14,18,0.22)] sm:h-[520px]">
+          <div className="anim-stage-reveal relative h-[440px] w-full overflow-hidden rounded-2xl border border-black/15 bg-[#ECEEF0] shadow-[0_20px_48px_-18px_rgba(13,14,18,0.14)] sm:h-[520px]">
             {showKinematics && <LazyMechanicalGardenShowcase />}
           </div>
         </div>

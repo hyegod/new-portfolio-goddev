@@ -7,7 +7,10 @@ export interface StirInput {
   dispose(): void;
 }
 
-export function installStirInput(canvas: HTMLCanvasElement): StirInput {
+export function installStirInput(
+  canvas: HTMLCanvasElement,
+  ambient = false
+): StirInput {
   let activePointer: number | undefined;
   let from: [number, number] = [0.5, 0.5];
   let to: [number, number] = [0.5, 0.5];
@@ -15,7 +18,9 @@ export function installStirInput(canvas: HTMLCanvasElement): StirInput {
   let lastTime = 0;
   let decay = 0;
   const previousTouchAction = canvas.style.touchAction;
-  canvas.style.touchAction = "none";
+  if (!ambient) {
+    canvas.style.touchAction = "none";
+  }
 
   const point = (event: PointerEvent): [number, number] => {
     const r = canvas.getBoundingClientRect();
@@ -28,8 +33,29 @@ export function installStirInput(canvas: HTMLCanvasElement): StirInput {
     ];
   };
 
+  const isInside = (event: PointerEvent) => {
+    const r = canvas.getBoundingClientRect();
+    return (
+      r.width > 0 &&
+      r.height > 0 &&
+      event.clientX >= r.left &&
+      event.clientX <= r.right &&
+      event.clientY >= r.top &&
+      event.clientY <= r.bottom
+    );
+  };
+
   const down = (event: PointerEvent) => {
-    if (!event.isPrimary || activePointer !== undefined) return;
+    if (!event.isPrimary) return;
+    if (ambient) {
+      if (!isInside(event)) return;
+      from = to = point(event);
+      lastTime = event.timeStamp;
+      velocity = [0.55, 0.35];
+      decay = 4;
+      return;
+    }
+    if (activePointer !== undefined) return;
     canvas.setPointerCapture(event.pointerId);
     activePointer = event.pointerId;
     from = to = point(event);
@@ -40,6 +66,10 @@ export function installStirInput(canvas: HTMLCanvasElement): StirInput {
 
   const move = (event: PointerEvent) => {
     if (!event.isPrimary) return;
+    if (ambient && !isInside(event)) {
+      lastTime = 0;
+      return;
+    }
     const next = point(event);
     if (lastTime === 0) {
       from = to = next;
@@ -76,11 +106,16 @@ export function installStirInput(canvas: HTMLCanvasElement): StirInput {
     }
   };
 
-  canvas.addEventListener("pointerdown", down);
-  canvas.addEventListener("pointermove", move);
-  canvas.addEventListener("pointerup", up);
-  canvas.addEventListener("pointercancel", up);
-  canvas.addEventListener("pointerleave", leave);
+  if (ambient) {
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerdown", down, { passive: true });
+  } else {
+    canvas.addEventListener("pointerdown", down);
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
+    canvas.addEventListener("pointerleave", leave);
+  }
 
   return {
     get active() {
@@ -103,19 +138,24 @@ export function installStirInput(canvas: HTMLCanvasElement): StirInput {
       }
     },
     dispose() {
-      canvas.removeEventListener("pointerdown", down);
-      canvas.removeEventListener("pointermove", move);
-      canvas.removeEventListener("pointerup", up);
-      canvas.removeEventListener("pointercancel", up);
-      canvas.removeEventListener("pointerleave", leave);
-      if (
-        activePointer !== undefined &&
-        canvas.hasPointerCapture?.(activePointer)
-      ) {
-        canvas.releasePointerCapture(activePointer);
+      if (ambient) {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerdown", down);
+      } else {
+        canvas.removeEventListener("pointerdown", down);
+        canvas.removeEventListener("pointermove", move);
+        canvas.removeEventListener("pointerup", up);
+        canvas.removeEventListener("pointercancel", up);
+        canvas.removeEventListener("pointerleave", leave);
+        if (
+          activePointer !== undefined &&
+          canvas.hasPointerCapture?.(activePointer)
+        ) {
+          canvas.releasePointerCapture(activePointer);
+        }
+        canvas.style.touchAction = previousTouchAction;
       }
       activePointer = undefined;
-      canvas.style.touchAction = previousTouchAction;
     },
   };
 }

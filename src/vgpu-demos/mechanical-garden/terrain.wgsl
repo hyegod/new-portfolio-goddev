@@ -82,46 +82,46 @@ fn fs_main(input: TerrainVarying) -> @location(0) vec4f {
   let n = normalize(input.normal);
   let footprint = max(fwidth(p.x), fwidth(p.z));
 
-  // Light gray troweled concrete: broad tonal mottling, fine aggregate, a faint painted 1 m grid.
+  // Bright exposed architectural concrete (#ECEEF0 tone): subtle aggregate, crisp 1 m blueprint grid.
   let tone = fbmSimplex2d(p.xz * 0.45, 3, 2.1, 0.5) * 0.5 + 0.5;
-  var albedo = vec3f(0.36, 0.36, 0.352) * (0.9 + 0.16 * tone);
-  albedo *= 1.0 + aggregate(p.xz, 90.0, footprint) * 0.12;
-  albedo *= 1.0 - gridLines(p.xz, GRID_SPACING, 0.008) * 0.22;
+  var albedo = vec3f(0.54, 0.56, 0.59) * (0.92 + 0.14 * tone);
+  albedo *= 1.0 + aggregate(p.xz, 90.0, footprint) * 0.09;
+  let grid = gridLines(p.xz, GRID_SPACING, 0.008);
+  albedo = mix(albedo, vec3f(0.28, 0.34, 0.48), grid * 0.34);
 
-  // Faint contour lines incised every CONTOUR_SPACING of height.
+  // Faint cobalt-slate topographic contour lines incised every CONTOUR_SPACING of height.
   let level = p.y / CONTOUR_SPACING;
   let lineFootprint = max(fwidth(level), 1e-4);
   let contour = 1.0 - smoothstep(0.0, lineFootprint * 1.2, abs(fract(level + 0.5) - 0.5));
-  albedo *= 1.0 - contour * 0.16 * (1.0 - smoothstep(0.02, 0.2, footprint));
+  albedo = mix(albedo, vec3f(0.16, 0.28, 0.62), contour * 0.22 * (1.0 - smoothstep(0.02, 0.2, footprint)));
 
-  // Hillshade: the floor sits on the tone-mapping shoulder, where plain lighting flattens gentle
-  // sculpted slopes, so exaggerate the tilt toward or away from the sun and deepen the hollows.
+  // Hillshade: exaggerate tilt toward or away from the sun so sculpted terrain relief reads crisply.
   let tilt = n.xz;
   let sunPlanar = normalize(scene.sunDirection.xz);
-  albedo *= clamp(1.0 + dot(tilt, sunPlanar) * 0.9 - length(tilt) * 0.4, 0.5, 1.3);
-  albedo *= 1.0 + min(p.y, 0.0) * 0.7;
+  albedo *= clamp(1.0 + dot(tilt, sunPlanar) * 0.78 - length(tilt) * 0.34, 0.58, 1.24);
+  albedo *= 1.0 + min(p.y, 0.0) * 0.55;
 
-  var surface = Surface(albedo, vec3f(0.035), 16.0, 1.0, vec3f(0.0));
-  surface.occlusion = contactShade(p) * mix(1.0, 0.72, saturate(input.cavity * 2.0));
+  var surface = Surface(albedo, vec3f(0.035), 18.0, 1.0, vec3f(0.0));
+  surface.occlusion = contactShade(p) * mix(1.0, 0.76, saturate(input.cavity * 2.0));
 
-  // Brush: amber ring for elevate, blue for lower, coral when aiming a destination.
+  // Brush: Electric Cobalt for elevate, Survey Slate for lower, bright Cobalt Beacon for destination.
   let brush = scene.brush;
   if (brush.w != 0.0) {
     let width = max(footprint * 1.2, 0.012);
     let edge = ring(p.xz, brush.xy, brush.z, width, footprint);
     let inner = ring(p.xz, brush.xy, brush.z * 0.35, width * 0.6, footprint) * 0.6;
-    var tint = vec3f(1.6, 1.05, 0.45);
+    var tint = vec3f(0.08, 0.36, 2.2);
     if (brush.w < 0.0) {
-      tint = vec3f(0.45, 1.05, 1.6);
+      tint = vec3f(0.14, 0.20, 0.34);
     } else if (brush.w > 1.5) {
-      tint = vec3f(1.7, 0.45, 0.3);
+      tint = vec3f(0.06, 0.42, 2.6);
     }
-    surface.emission += tint * (edge + inner) * 0.6;
+    surface.emission += tint * (edge + inner) * 0.72;
     let inside = 1.0 - smoothstep(brush.z - footprint, brush.z + footprint, length(p.xz - brush.xy));
-    surface.albedo = mix(surface.albedo, surface.albedo * 0.92 + tint * 0.03, inside * 0.5);
+    surface.albedo = mix(surface.albedo, surface.albedo * 0.90 + vec3f(0.02, 0.10, 0.38) * 0.14, inside * 0.55);
   }
 
-  // Destination: a pulsing coral ring that settles, with a small cross at its centre.
+  // Destination: pulsing Electric Cobalt survey ring & CAD crosshair.
   let destination = scene.destination;
   if (destination.z > 0.5) {
     let age = destination.w;
@@ -132,7 +132,7 @@ fn fs_main(input: TerrainVarying) -> @location(0) vec4f {
     let mark = ring(p.xz, destination.xy, radius, width, footprint);
     let offset = abs(p.xz - destination.xy);
     let crossBar = (1.0 - smoothstep(width - footprint, width + footprint, min(offset.x, offset.y))) * step(max(offset.x, offset.y), 0.12);
-    surface.emission += vec3f(1.9, 0.5, 0.32) * (mark * (0.55 + 0.45 * pulse) + crossBar * 0.8);
+    surface.emission += vec3f(0.08, 0.40, 2.65) * (mark * (0.62 + 0.45 * pulse) + crossBar * 0.9);
   }
 
   let viewDirection = normalize(camera.eye - p);

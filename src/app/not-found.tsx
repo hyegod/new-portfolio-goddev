@@ -9,14 +9,14 @@ export default function NotFound() {
   return (
     <PortfolioExperience>
       <Navbar />
-      <main className="relative flex min-h-[85svh] items-center overflow-hidden border-b border-white/12 bg-[#06070B] px-3 pt-28 pb-20 text-white min-[380px]:px-4 sm:px-8 lg:px-12">
+      <main className="relative flex min-h-[85svh] items-center overflow-hidden border-b border-white/12 bg-[#08090D] px-3 pt-28 pb-20 text-white min-[380px]:px-4 sm:px-8 lg:px-12">
         {/* Live Multi-Pass Baked Optimized Black Hole Backdrop */}
         <div className="absolute inset-0 z-0">
           <LazyBlackHoleShowcase ambient />
         </div>
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-r from-[#06070B]/92 via-[#06070B]/55 to-transparent"
+          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-r from-[#08090D]/92 via-[#08090D]/55 to-transparent"
         />
 
         <div className="relative z-10 mx-auto w-full max-w-[1440px]">

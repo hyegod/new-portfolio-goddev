@@ -109,7 +109,7 @@ fn loopPhase(t: f32) -> f32 {
   return t / LOOP * TAU;
 }
 
-// A banded planet with a tilted ring.
+// A banded planet with a tilted ring (GODDEV Electric Cobalt × Survey Ice × Platinum).
 fn sphere(seed: Seed, t: f32) -> Point {
   if (seed.w < 0.27) {
     let r = 1.1 + 0.42 * seed.v;
@@ -117,14 +117,14 @@ fn sphere(seed: Seed, t: f32) -> Point {
     var p = vec3f(cos(a) * r, (seed.y - 0.5) * 0.012, sin(a) * r);
     p = rotateX(p, 0.42);
     let bands = 0.55 + 0.45 * sin(r * 70.0) * sin(r * 23.0);
-    return Point(p, vec3f(1.0, 0.64, 0.32) * (0.45 + 0.75 * bands));
+    return Point(p, vec3f(0.76, 0.88, 1.0) * (0.45 + 0.72 * bands));
   }
   let z = 1.0 - 2.0 * seed.v;
   let rho = sqrt(max(0.0, 1.0 - z * z));
   let a = seed.u * TAU - loopPhase(t);
   let p = vec3f(rho * cos(a), z, rho * sin(a)) * 0.8;
   let latitude = pow(0.5 + 0.5 * cos(z * 42.0), 10.0);
-  let color = mix(vec3f(0.12, 0.72, 1.0), vec3f(0.62, 0.3, 1.0), 0.5 + 0.5 * z) * (0.8 + 1.2 * latitude);
+  let color = mix(vec3f(0.05, 0.32, 1.0), vec3f(0.45, 0.74, 1.0), 0.5 + 0.5 * z) * (0.82 + 1.15 * latitude);
   return Point(rotateX(p, 0.42), color);
 }
 
@@ -133,7 +133,7 @@ fn knotCurve(phi: f32) -> vec3f {
   return vec3f(r * cos(2.0 * phi), sin(3.0 * phi) * 1.1, r * sin(2.0 * phi)) * 0.34;
 }
 
-// A (2, 3) torus knot; particles flow along the tube once per loop.
+// A (2, 3) torus knot; particles flow along the tube in Electric Cobalt, Survey Ice & Platinum.
 fn knot(seed: Seed, t: f32) -> Point {
   let along = fract(seed.u + t / LOOP);
   let phi = along * TAU;
@@ -144,12 +144,12 @@ fn knot(seed: Seed, t: f32) -> Point {
   let theta = seed.v * TAU;
   let radius = select(0.13 * sqrt(seed.x), 0.13, seed.w < 0.8);
   let pos = center + (normal * cos(theta) + binormal * sin(theta)) * radius;
-  let hue = along * 2.0;
-  let color = 0.5 + 0.5 * cos(TAU * (vec3f(hue) + vec3f(0.0, 0.36, 0.64)));
-  return Point(pos, (color * color + 0.08) * 1.35);
+  let wave = 0.5 + 0.5 * sin(along * TAU * 2.0);
+  let color = mix(vec3f(0.04, 0.28, 1.0), vec3f(0.62, 0.82, 1.0), wave);
+  return Point(pos, color * 1.28);
 }
 
-// A rippling lattice: most particles sit on grid lines, so it reads as a mesh.
+// A rippling architectural lattice: most particles sit on grid lines.
 fn waves(seed: Seed, t: f32) -> Point {
   var x = (seed.u - 0.5) * 3.4;
   var z = (seed.v - 0.5) * 2.4;
@@ -162,7 +162,7 @@ fn waves(seed: Seed, t: f32) -> Point {
   let phase = loopPhase(t);
   let height = 0.19 * sin(d * 5.5 - phase * 6.0) * exp(-d * 0.4) + 0.07 * sin(x * 2.4 + phase * 3.0);
   let crest = clamp(height * 3.2 + 0.5, 0.0, 1.0);
-  var color = mix(vec3f(0.08, 0.22, 0.95), vec3f(0.2, 0.95, 1.0), crest) + vec3f(pow(crest, 6.0) * 0.9);
+  var color = mix(vec3f(0.05, 0.24, 1.0), vec3f(0.32, 0.74, 1.0), crest) + vec3f(0.85, 0.92, 1.0) * pow(crest, 6.0) * 0.85;
   let edge = max(abs(x) / 1.7, abs(z) / 1.2);
   color *= 1.0 - 0.75 * smoothstep(0.7, 1.0, edge);
   return Point(vec3f(x, height - 0.05, z), color);
@@ -341,10 +341,10 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3u) {
     case 1u: { shade = inferno(speed); }
     case 2u: { shade = phaseColor(motion); }
     default: {
-      shade = color * (1.0 + speed * 0.6) + vec3f(1.0, 0.5, 0.18) * overshoot * 3.5;
+      shade = color * (1.0 + speed * 0.6) + vec3f(0.55, 0.82, 1.0) * overshoot * 3.2;
     }
   }
-  shade += vec3f(1.0, 0.62, 0.3) * heat;
+  shade += vec3f(0.68, 0.88, 1.0) * heat;
 
   var out: Particle;
   out.ndc = ndc;

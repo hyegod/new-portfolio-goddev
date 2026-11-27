@@ -63,7 +63,7 @@ export function OptimizedBlackHoleShowcase({
 
   return (
     <div
-      className={`relative h-full w-full overflow-hidden bg-[#06070B] ${className}`}
+      className={`relative h-full w-full overflow-hidden bg-[#08090D] ${className}`}
       aria-hidden={ambient ? "true" : undefined}
     >
       <canvas

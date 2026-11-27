@@ -1,6 +1,5 @@
-// Scene + two bloom levels, exposure and ACES in linear light, then the sRGB
-// transfer for the canvas. The deep-blue backdrop and vignette are applied in
-// display space, and a one-step dither keeps the dark gradient band-free.
+// Scene + two bloom levels, exposure and ACES in linear light on GODDEV Dark Obsidian (#06070C)
+// with Electric Cobalt × Survey Ice × Platinum particle bloom and band-free dithering.
 
 import { linearToSrgb3, tonemapAces } from "@vgpu/wgsl-std/color";
 import { pcg2d } from "@vgpu/wgsl-std/hash";
@@ -25,9 +24,9 @@ struct Params {
   var color = linearToSrgb3(tonemapAces(hdr * params.exposure));
 
   let centered = (uv - 0.5) * vec2f(params.aspect, 1.0);
-  let backdrop = mix(vec3f(0.035, 0.05, 0.11), vec3f(0.004, 0.006, 0.016), smoothstep(0.1, 1.1, length(centered)));
+  let backdrop = mix(vec3f(0.028, 0.042, 0.095), vec3f(0.012, 0.015, 0.028), smoothstep(0.1, 1.1, length(centered)));
   color = color + backdrop * (1.0 - color);
-  let vignette = 1.0 - 0.35 * smoothstep(0.45, 1.25, length((uv - 0.5) * 2.0));
+  let vignette = 1.0 - 0.34 * smoothstep(0.45, 1.25, length((uv - 0.5) * 2.0));
   color *= vignette;
 
   let noise = pcg2d(vec2u(position.xy));

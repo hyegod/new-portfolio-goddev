@@ -42,38 +42,39 @@ const ICONS: Readonly<Record<Tool, string>> = {
 
 const ACCENT = "#0038FF";
 const STYLE = `
-.mg-toolbar{position:absolute;left:12px;top:12px;z-index:10;display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:calc(100% - 24px);font:12px/1.3 ui-sans-serif,system-ui,-apple-system,sans-serif;color:#ececec;pointer-events:none;user-select:none;-webkit-user-select:none}
-.mg-panel{pointer-events:auto;background:rgba(13,14,18,.84);border:1px solid rgba(255,255,255,.12);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.28);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-.mg-tools{display:flex;gap:2px;padding:3px}
-.mg-tool{display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:inherit;font:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.mg-tool:hover{background:rgba(255,255,255,.09)}
-.mg-tool[aria-pressed="true"]{background:${ACCENT};color:#ffffff;font-weight:600}
+.mg-toolbar{position:absolute;left:12px;top:12px;z-index:10;display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:calc(100% - 24px);font:600 10px/1.35 var(--font-jetbrains-mono),ui-monospace,monospace;letter-spacing:0.12em;text-transform:uppercase;color:#0D0E12;pointer-events:none;user-select:none;-webkit-user-select:none}
+.mg-panel{pointer-events:auto;background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(236,239,244,.72));border:1px solid rgba(13,14,18,.13);border-radius:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.94),0 12px 28px -10px rgba(13,14,18,.16);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%)}
+.mg-tools{display:flex;gap:3px;padding:3px}
+.mg-tool{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:#363B47;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background .15s,color .15s,border-color .15s}
+.mg-tool:hover{background:rgba(0,56,255,.08);color:${ACCENT}}
+.mg-tool[aria-pressed="true"]{background:${ACCENT};border-color:${ACCENT};color:#ffffff;font-weight:700;box-shadow:0 4px 12px -4px rgba(0,56,255,.45)}
 .mg-tool:focus-visible,.mg-clear:focus-visible{outline:2px solid ${ACCENT};outline-offset:2px}
-.mg-tool svg{display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.mg-tool kbd{font:10px/1 ui-monospace,monospace;padding:2px 4px;border-radius:4px;background:rgba(255,255,255,.1);opacity:.7}
-.mg-tool[aria-pressed="true"] kbd{background:rgba(0,0,0,.14)}
-.mg-detail{display:flex;flex-direction:column;gap:6px;padding:7px 10px}
-.mg-hint{margin:0;color:#d4d4d4}
+.mg-tool svg{display:block;width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.mg-tool kbd{font:600 9px/1 var(--font-jetbrains-mono),ui-monospace,monospace;padding:2px 5px;border-radius:4px;background:rgba(13,14,18,.07);color:#505562}
+.mg-tool[aria-pressed="true"] kbd{background:rgba(255,255,255,.22);color:#ffffff}
+.mg-detail{display:flex;flex-direction:column;gap:6px;padding:7px 11px}
+.mg-hint{margin:0;color:#505562;font-weight:500;font-size:9.5px;letter-spacing:0.1em}
 .mg-paused{margin:0;color:${ACCENT}}
 .mg-paused[hidden]{display:none}
-.mg-brush{display:flex;flex-wrap:wrap;gap:4px 14px}
+.mg-brush{display:flex;flex-wrap:wrap;gap:6px 14px}
 .mg-brush[hidden],.mg-clear[hidden]{display:none}
-.mg-brush label{display:flex;align-items:center;gap:7px;color:#bdbdbd}
+.mg-brush label{display:flex;align-items:center;gap:7px;color:#363B47;font-size:9.5px}
 .mg-brush span{flex:none}
-.mg-brush input{width:104px;margin:0;accent-color:${ACCENT};touch-action:pan-x}
-.mg-brush output{min-width:2.2em;color:#ececec;font-variant-numeric:tabular-nums}
-.mg-clear{align-self:flex-start;height:24px;padding:0 9px;border:1px solid rgba(255,255,255,.18);border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer}
-.mg-clear:disabled{opacity:.45;cursor:default}
+.mg-brush input{width:96px;margin:0;accent-color:${ACCENT};touch-action:pan-x}
+.mg-brush output{min-width:2.4em;color:#0038FF;font-weight:700;font-variant-numeric:tabular-nums}
+.mg-clear{align-self:flex-start;height:26px;padding:0 10px;border:1px solid rgba(13,14,18,.18);border-radius:7px;background:rgba(255,255,255,.72);color:#0D0E12;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.mg-clear:hover:not(:disabled){border-color:${ACCENT};background:${ACCENT};color:#ffffff}
+.mg-clear:disabled{opacity:.42;cursor:default}
 .mg-toolbar[data-layout="compact"]{left:8px;right:8px;top:auto;bottom:8px;max-width:none;align-items:stretch;flex-direction:column-reverse}
-.mg-toolbar[data-layout="compact"] .mg-tool{flex:1 1 0;flex-direction:column;justify-content:center;gap:3px;height:52px;padding:4px 2px;font-size:11px}
+.mg-toolbar[data-layout="compact"] .mg-tool{flex:1 1 0;flex-direction:column;justify-content:center;gap:3px;height:48px;padding:4px 2px;font-size:9px;letter-spacing:0.08em}
 .mg-toolbar[data-layout="compact"] .mg-tool kbd{display:none}
 .mg-toolbar[data-layout="compact"] .mg-brush input{flex:1 1 auto;width:auto;min-width:56px}
-.mg-toolbar[data-layout="compact"] .mg-brush label{flex:1 1 140px}
+.mg-toolbar[data-layout="compact"] .mg-brush label{flex:1 1 130px}
 .mg-toolbar[data-pointer="coarse"] .mg-tool{min-height:44px;min-width:44px}
 .mg-toolbar[data-pointer="coarse"] .mg-tool kbd{display:none}
 .mg-toolbar[data-pointer="coarse"] .mg-brush input{height:32px}
-.mg-toolbar[data-pointer="coarse"] .mg-clear{height:40px;padding:0 14px}
-.mg-toolbar[data-pointer="coarse"][data-layout="wide"] .mg-tool{height:44px;padding:0 14px}
+.mg-toolbar[data-pointer="coarse"] .mg-clear{height:38px;padding:0 14px}
+.mg-toolbar[data-pointer="coarse"][data-layout="wide"] .mg-tool{height:40px;padding:0 12px}
 `;
 
 export interface ToolbarOptions {
