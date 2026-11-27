@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    "Personal portfolio of Godlift Farrelio — Civil Engineering student at Bosowa University & Full-Stack Software Developer uniting structures, code, 3D WebGL, bass music, and photography.",
+    "Personal portfolio of Godlift Farrelio — Civil Engineering student at Bosowa University & Full-Stack Software Developer uniting structures, full-stack software, and interactive 3D web engineering.",
   keywords: [
     "Godlift Farrelio",
     "Civil Engineering",
@@ -64,14 +64,14 @@ export const metadata: Metadata = {
     type: "website",
     title: "Godlift Farrelio — Civil Engineering × Software Development",
     description:
-      "Civil Engineering student at Bosowa University & Full-Stack Software Developer from Indonesia — uniting structures, code, music, and visual storytelling.",
+      "Civil Engineering student at Bosowa University & Full-Stack Software Developer from Indonesia — uniting structural engineering, full-stack software, and interactive 3D web craft.",
     siteName: "GODDEV // CIVIL × SWE",
   },
   twitter: {
     card: "summary_large_image",
     title: "Godlift Farrelio — Civil Engineering × Software Development",
     description:
-      "Civil Engineering, Full-Stack Software Development, 3D WebGL LiDAR, Bass Music & Photography — Indonesia.",
+      "Civil Engineering, Full-Stack Software Development, BIM & Interactive 3D WebGL — Indonesia.",
   },
   robots: {
     index: true,

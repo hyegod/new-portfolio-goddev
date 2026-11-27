@@ -259,7 +259,7 @@ export function HeroSection() {
               <span className="font-bold text-[#0D0E12] underline decoration-[#0038FF]/60 decoration-2 underline-offset-4">
                 Software Developer
               </span>{" "}
-              uniting structural design, full-stack code, bass music, and visual craft.
+              uniting structural design, full-stack engineering, and interactive 3D web craft.
             </p>
           </div>
 

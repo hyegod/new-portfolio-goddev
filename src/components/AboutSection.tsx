@@ -49,9 +49,8 @@ export function AboutSection() {
                 I combine civil engineering logic with software craftsmanship —
                 designing buildings, seismic frames, and BIM workflows alongside
                 full-stack web, mobile, and 3D interactive apps. Off the clock,
-                music is my creative escape through playing bass, while
-                photography and videography let me capture everyday stories
-                through a lens.
+                I unwind with music and capture everyday moments through
+                photography.
               </p>
             </div>
           </div>

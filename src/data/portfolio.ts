@@ -114,7 +114,7 @@ export const ABOUT_STATS = [
   { label: "DUAL TRACK", value: "CIVIL × SWE" },
   { label: "CODING SINCE", value: "2021 — NOW" },
   { label: "UNIVERSITY", value: "BOSOWA UNIV." },
-  { label: "CREATIVE", value: "BASS · PHOTO" },
+  { label: "FOCUS", value: "3D · BIM · WEB" },
 ];
 
 // Technical Spec Sheet pillars — easily extensible by adding items or appending strings to `tools`.
@@ -246,11 +246,11 @@ export const SKILL_PILLARS: SkillPillar[] = [
         tools: ["GSAP", "Lenis", "Motion", "Tailwind v4"],
       },
       {
-        name: "Music, Bass & Visual Media",
+        name: "Visual Media & Music",
         tier: "SPEC",
         detail:
-          "Bass-driven music production, DAW sound design, and visual storytelling through photography & film.",
-        tools: ["Ableton Live", "FL Studio", "Bass Guitar", "Photography", "Videography"],
+          "Photography, videography, and creative music production on the side.",
+        tools: ["Photography", "Videography", "Music", "Ableton Live"],
       },
     ],
   },
@@ -617,9 +617,9 @@ export const PHOTO_GALLERY: PhotoGalleryItem[] = [
   {
     id: "photo-04",
     frame: "04",
-    title: "LOW-END STAGE LIGHTS · BASS CHECK",
+    title: "EVENING STAGE LIGHTS · SOUNDCHECK",
     description:
-      "Vertical frame from soundcheck before an evening gig — tungsten rim light cutting through stage haze across the bass headstock.",
+      "Vertical frame from an evening live session — warm tungsten rim light cutting through stage haze.",
     takenDate: "2026-09-22",
     location: "Makassar Music Space",
     category: "STAGE",
