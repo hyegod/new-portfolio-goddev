@@ -1,7 +1,10 @@
 "use client";
 
+import { useRef } from "react";
 import { motion } from "motion/react";
 import { SKILL_PILLARS, type SkillTier } from "@/data/portfolio";
+import { useInViewport } from "@/lib/devicePerf";
+import { LazyInteractiveFluidShowcase } from "./VgpuShowcases";
 
 const STANDARDS = [
   "SNI 1726 & 2847",
@@ -9,7 +12,7 @@ const STANDARDS = [
   "AISC 360",
   "ISO 19650 OPENBIM",
   "WGS84 / GIS",
-  "WEBGL2 & GLSL",
+  "WEBGPU & WGSL",
   "REST / GRAPHQL",
 ];
 
@@ -24,6 +27,9 @@ function tierBadgeClass(tier: SkillTier) {
 }
 
 export function SkillSection() {
+  const fluidRef = useRef<HTMLDivElement>(null);
+  const showFluid = useInViewport(fluidRef, "420px 0px");
+
   return (
     <section
       id="skill"
@@ -142,19 +148,43 @@ export function SkillSection() {
           ))}
         </div>
 
-        {/* Clean Cobalt Standards & Protocols Strip */}
-        <div className="reveal-up glass-cobalt mt-6 flex flex-wrap items-center gap-2 rounded-xl px-3.5 py-3.5 sm:mt-8 sm:gap-2.5 sm:px-5 sm:py-4">
-          <span className="mr-1 font-mono text-[9.5px] font-bold tracking-[0.18em] text-[#0038FF] uppercase sm:mr-2 sm:text-[10px] sm:tracking-[0.2em]">
-            CODES &amp; PROTOCOLS //
-          </span>
-          {STANDARDS.map((std) => (
-            <span
-              key={std}
-              className="text-trim rounded-md border border-black/12 bg-white/80 px-2 py-1 font-mono text-[9.5px] tracking-[0.12em] text-[#0D0E12] uppercase sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
-            >
-              {std}
+        {/* Interactive Navier-Stokes Fluid Stage & Engineering Standards Strip */}
+        <div
+          ref={fluidRef}
+          className="anim-stage-reveal relative mt-8 flex min-h-[280px] flex-col justify-between overflow-hidden rounded-2xl border border-black/20 bg-[#06080F] shadow-[0_24px_54px_-18px_rgba(6,8,16,0.4)] sm:mt-10 sm:min-h-[340px]"
+        >
+          {/* Live Interactive Fluid Canvas (vgpu compute solver + WebGL2 mobile fallback) */}
+          <div className="absolute inset-0 z-0">
+            {showFluid && <LazyInteractiveFluidShowcase />}
+          </div>
+
+          {/* Floating Minimal Top Telemetry (pointer-events-none so mouse stirs fluid freely) */}
+          <div className="pointer-events-none relative z-10 flex flex-wrap items-center justify-between gap-2 p-3.5 sm:p-5">
+            <span className="glass-obsidian inline-flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[9.5px] font-semibold tracking-[0.16em] text-white uppercase sm:text-[10px] sm:tracking-[0.2em]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#5B86FF]" />
+              <span>FLUID MECHANICS × GPU // INTERACTIVE NAVIER-STOKES</span>
             </span>
-          ))}
+            <span className="glass-obsidian rounded-lg px-3 py-1.5 font-mono text-[9px] tracking-[0.16em] text-white/75 uppercase sm:text-[9.5px]">
+              MOVE OR DRAG TO STIR
+            </span>
+          </div>
+
+          {/* Floating Bottom Codes & Protocols Glass Strip */}
+          <div className="pointer-events-none relative z-10 p-3.5 sm:p-5">
+            <div className="glass-obsidian flex flex-wrap items-center gap-1.5 rounded-xl px-3.5 py-3 sm:gap-2 sm:px-5 sm:py-3.5">
+              <span className="mr-1 font-mono text-[9.5px] font-bold tracking-[0.18em] text-[#78A6FF] uppercase sm:mr-2 sm:text-[10px] sm:tracking-[0.2em]">
+                CODES &amp; PROTOCOLS //
+              </span>
+              {STANDARDS.map((std) => (
+                <span
+                  key={std}
+                  className="text-trim rounded-md border border-white/15 bg-white/10 px-2 py-1 font-mono text-[9px] tracking-[0.12em] text-white uppercase sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
+                >
+                  {std}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>
