@@ -1,18 +1,11 @@
-"use client";
-
-import { useRef } from "react";
 import {
   ABOUT_STATS,
   EXPERIENCE,
   PORTFOLIO_PROFILE,
 } from "@/data/portfolio";
-import { useInViewport } from "@/lib/devicePerf";
 import { SpraySignature } from "./SprayArtworks";
-import { LazyMechanicalGardenShowcase } from "./VgpuShowcases";
 
 export function AboutSection() {
-  const kinematicsRef = useRef<HTMLDivElement>(null);
-  const showKinematics = useInViewport(kinematicsRef, "220px 0px");
   return (
     <section
       id="about"
@@ -104,22 +97,6 @@ export function AboutSection() {
               </p>
             </div>
           ))}
-        </div>
-
-        {/* Interactive Computational Kinematics Stage (Mechanical Garden — FABRIK IK on Exposed Concrete) */}
-        <div ref={kinematicsRef} className="mt-12 sm:mt-14">
-          <div className="reveal-up mb-3.5 flex flex-wrap items-baseline justify-between gap-2 font-mono text-[10px] tracking-[0.18em] uppercase sm:text-[11px] sm:tracking-[0.22em]">
-            <span className="font-semibold text-[#0038FF]">
-              COMPUTATIONAL KINEMATICS // MECHANICAL GARDEN · FABRIK IK
-            </span>
-            <span className="text-[#505562]">
-              ORBIT · SCULPT CONCRETE · CLICK DESTINATION (VGPU/SCENE)
-            </span>
-          </div>
-
-          <div className="anim-stage-reveal relative h-[440px] w-full overflow-hidden rounded-2xl border border-black/15 bg-[#ECEEF0] shadow-[0_20px_48px_-18px_rgba(13,14,18,0.14)] sm:h-[520px]">
-            {showKinematics && <LazyMechanicalGardenShowcase />}
-          </div>
         </div>
 
         {/* Personal Experience & Engineering Track Record */}

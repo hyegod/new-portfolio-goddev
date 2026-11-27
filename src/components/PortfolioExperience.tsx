@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
+import { LazyRoamingBotsOverlay } from "./VgpuShowcases";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -429,6 +430,8 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
     <div ref={rootRef} className="relative min-h-screen">
       {/* Native CSS Scroll-Driven Progress Indicator */}
       <div id="scroll-progress" aria-hidden="true" />
+      {/* Transparent Full-Viewport Free-Roaming Quadruped FABRIK IK Companions */}
+      <LazyRoamingBotsOverlay />
       {children}
     </div>
   );
