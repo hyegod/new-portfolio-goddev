@@ -33,6 +33,8 @@ export type VgpuStatus = "loading" | "webgpu" | "webgl" | "unsupported";
 export interface VgpuCanvasProps {
   shaderId: VgpuShaderId;
   ambient?: boolean;
+  /** Scroll-safe touch lock (prevents touch drag from hijacking page scroll until user unlocks). */
+  touchLocked?: boolean;
   paused?: boolean;
   maxDpr?: number;
   forceWebgl?: boolean;
@@ -138,6 +140,7 @@ function drawProceduralVideoFeed(
 export function VgpuCanvas({
   shaderId,
   ambient = false,
+  touchLocked = false,
   paused = false,
   maxDpr = 2,
   forceWebgl = false,
@@ -160,6 +163,9 @@ export function VgpuCanvas({
 
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+
+  const touchLockedRef = useRef(touchLocked);
+  touchLockedRef.current = touchLocked;
 
   const videoRef = useRef<HTMLVideoElement | null>(videoElement);
   videoRef.current = videoElement;
@@ -219,6 +225,7 @@ export function VgpuCanvas({
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      if (touchLockedRef.current && e.pointerType !== "mouse") return;
       updatePointerFromClient(e.clientX, e.clientY);
       if (ptr.pressed && !ambient) {
         const dx = e.clientX - ptr.lastDragX;
@@ -235,6 +242,7 @@ export function VgpuCanvas({
 
     const onPointerDown = (e: PointerEvent) => {
       if (ambient) return;
+      if (touchLockedRef.current && e.pointerType !== "mouse") return;
       ptr.pressed = true;
       ptr.lastDragX = e.clientX;
       ptr.lastDragY = e.clientY;
@@ -659,7 +667,13 @@ export function VgpuCanvas({
         ref={canvasRef}
         className={`block h-full w-full transition-opacity duration-500 ${
           isLive ? "opacity-100" : "opacity-0"
-        } ${ambient ? "pointer-events-none" : "touch-none cursor-crosshair"}`}
+        } ${
+          ambient
+            ? "pointer-events-none"
+            : touchLocked
+              ? "touch-pan-y"
+              : "touch-none cursor-crosshair"
+        }`}
       />
 
       {status === "unsupported" && !ambient && (

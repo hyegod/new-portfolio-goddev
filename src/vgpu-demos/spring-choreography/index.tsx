@@ -67,6 +67,7 @@ export function SpringChoreographyShowcase({
     return (
       <LazyVgpuCanvas
         shaderId="fluid"
+        ambient
         forceWebgl
         maxDpr={1.4}
         className={className}
@@ -84,7 +85,7 @@ export function SpringChoreographyShowcase({
         ref={canvasRef}
         role="img"
         aria-label="GPU particle swarm morphing on real Motion springs between wave, ring, and infinite torus knot. Move pointer to part particles or click for a spring burst."
-        className={`block h-full w-full touch-none transition-opacity duration-700 ${
+        className={`block h-full w-full touch-pan-y transition-opacity duration-700 ${
           status === "webgpu" ? "opacity-100" : "opacity-0"
         }`}
       />

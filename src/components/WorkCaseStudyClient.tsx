@@ -7,6 +7,7 @@ import type { ProjectItem } from "@/data/portfolio";
 import { useNearViewport, usePerformanceProfile } from "@/lib/devicePerf";
 import { generatePresetPointCloud } from "@/lib/pointCloudGenerator";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
+import { TouchInteractPill, useTouchInteractGate } from "./TouchInteractGate";
 
 interface WorkCaseStudyClientProps {
   project: ProjectItem;
@@ -27,6 +28,7 @@ export function WorkCaseStudyClient({
 
   const perf = usePerformanceProfile();
   const isNearStage = useNearViewport(stageRef, "300px 0px");
+  const touchGate = useTouchInteractGate(stageRef);
 
   const cloud = useMemo(() => {
     if (!isNearStage || !perf) return null;
@@ -114,10 +116,14 @@ export function WorkCaseStudyClient({
         {/* Dedicated Interactive 3D Specimen Hero Stage */}
         <div ref={stageRef} className="anim-stage-reveal mb-10 sm:mb-12">
           <div
-            className={`relative h-[380px] w-full overflow-hidden rounded-2xl border transition-colors duration-300 sm:h-[480px] lg:h-[540px] ${
+            className={`relative h-[380px] w-full overflow-hidden rounded-2xl border transition-all duration-300 sm:h-[480px] lg:h-[540px] ${
               darkStage
                 ? "gather-surface-dark border-black/25 shadow-[0_24px_56px_-16px_rgba(6,8,16,0.42)]"
                 : "gather-surface-light border-black/20 shadow-[0_24px_56px_-16px_rgba(13,14,18,0.16)]"
+            } ${
+              touchGate.isTouchDevice && touchGate.active
+                ? "ring-2 ring-[#0038FF]/70"
+                : ""
             }`}
           >
             <div className="absolute inset-0">
@@ -136,7 +142,7 @@ export function WorkCaseStudyClient({
                   travelMode={project.preset === "terrain" ? "melt" : "swarm"}
                   draw={{ track: true, links: true, scan: false, marks: true }}
                   paused={paused}
-                  interactive
+                  interactive={touchGate.interactive}
                   showHud
                   showGimbal
                   cameraDistance={3.6}
@@ -145,6 +151,15 @@ export function WorkCaseStudyClient({
                   ariaLabel={`Interactive 3D structural point cloud for ${project.title}`}
                 />
               )}
+            </div>
+
+            <div className="pointer-events-none absolute right-3 bottom-3 z-20 sm:right-4 sm:bottom-4">
+              <TouchInteractPill
+                visible={touchGate.isTouchDevice}
+                active={touchGate.active}
+                lightSurface={!darkStage}
+                onToggle={touchGate.toggle}
+              />
             </div>
 
             {/* Floating Top HUD */}

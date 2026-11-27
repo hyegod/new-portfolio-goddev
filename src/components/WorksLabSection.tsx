@@ -37,6 +37,7 @@ import type {
 } from "./GatherPointCloud";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
 import { LazyVgpuCanvas } from "./LazyVgpuCanvas";
+import { TouchInteractPill, useTouchInteractGate } from "./TouchInteractGate";
 import type { VgpuShaderId, VgpuStatus } from "./VgpuCanvas";
 
 const BUILTIN_PRESETS: PointPresetId[] = ["bridge", "tower", "terrain", "shell"];
@@ -344,6 +345,7 @@ export function WorksLabSection({
   const [denseTrackers, setDenseTrackers] = useState<boolean>(false);
   const [paused, setPaused] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const touchGate = useTouchInteractGate(stageRef, isFullscreen);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
   const [activePlate, setActivePlate] = useState<GalleryPlate | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>(
@@ -773,10 +775,14 @@ export function WorksLabSection({
               void handleFiles(e.dataTransfer.files);
             }
           }}
-          className={`deferred-lab relative flex min-h-[600px] w-full min-w-0 flex-col justify-between overflow-hidden rounded-2xl border transition-colors duration-300 sm:min-h-[680px] lg:min-h-[740px] ${
+          className={`deferred-lab relative flex min-h-[600px] w-full min-w-0 flex-col justify-between overflow-hidden rounded-2xl border transition-all duration-300 sm:min-h-[680px] lg:min-h-[740px] ${
             studioMode === "lidar" && paperLight
               ? "gather-surface-light border-black/20 shadow-[0_24px_56px_-18px_rgba(13,14,18,0.18)]"
               : "gather-surface-dark border-black/25 shadow-[0_28px_64px_-18px_rgba(6,8,16,0.45)]"
+          } ${
+            touchGate.isTouchDevice && touchGate.active
+              ? "ring-2 ring-[#0038FF]/70"
+              : ""
           }`}
         >
         {studioMode === "lidar" ? (
@@ -798,7 +804,7 @@ export function WorksLabSection({
               draw={draw}
               denseTrackers={denseTrackers}
               paused={paused}
-              interactive
+              interactive={touchGate.interactive}
               showHud
               showGimbal
               cameraDistance={3.95}
@@ -898,7 +904,7 @@ export function WorksLabSection({
         </div>
 
         {/* Floating Smoked Glass Structural Specimen Rail (horizontal bar on mobile, vertical left rail on sm+) */}
-        <div className="pointer-events-none relative z-20 flex min-w-0 flex-1 items-end px-2.5 pb-1 sm:items-center sm:px-5 sm:pb-0">
+        <div className="pointer-events-none relative z-20 flex min-w-0 flex-1 flex-col justify-end gap-2 px-2.5 pb-1 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:pb-0">
           <div
             className={`no-scrollbar pointer-events-auto flex max-w-full flex-row items-center gap-2 overflow-x-auto rounded-xl p-2 sm:flex-col sm:items-stretch sm:gap-2.5 sm:overflow-visible sm:p-3 ${
               paperLight ? "glass-vellum" : "glass-obsidian"
@@ -970,6 +976,15 @@ export function WorksLabSection({
                 void handleFiles(e.target.files);
                 e.target.value = "";
               }}
+            />
+          </div>
+
+          <div className="flex justify-end sm:self-end sm:pb-2">
+            <TouchInteractPill
+              visible={touchGate.isTouchDevice && !isFullscreen}
+              active={touchGate.active}
+              lightSurface={paperLight}
+              onToggle={touchGate.toggle}
             />
           </div>
         </div>
@@ -1144,6 +1159,7 @@ export function WorksLabSection({
           {isNearStage && perf && (
             <LazyVgpuCanvas
               shaderId={activeVgpuShader}
+              touchLocked={!touchGate.interactive}
               paused={paused}
               maxDpr={Math.min(1.75, perf.maxDpr)}
               forceWebgl={forceWebglEngine}
@@ -1247,6 +1263,15 @@ export function WorksLabSection({
               )}
             </button>
           </div>
+        </div>
+
+        {/* Touch-Only Scroll-Safe Interaction Pill for WebGPU Lab */}
+        <div className="pointer-events-none relative z-20 flex flex-1 items-end justify-end px-2.5 pb-1 sm:px-5 sm:pb-2">
+          <TouchInteractPill
+            visible={touchGate.isTouchDevice && !isFullscreen}
+            active={touchGate.active}
+            onToggle={touchGate.toggle}
+          />
         </div>
 
         {/* Bottom Floating Smoked Glass 6-Shader Selector Dock */}

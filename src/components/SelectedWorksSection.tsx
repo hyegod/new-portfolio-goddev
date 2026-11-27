@@ -12,6 +12,7 @@ import {
 } from "@/lib/pointCloudGenerator";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
 import { GitHubWorksPanel } from "./GitHubWorksPanel";
+import { TouchInteractPill, useTouchInteractGate } from "./TouchInteractGate";
 import { WorksLabSection } from "./WorksLabSection";
 
 export function SelectedWorksSection({
@@ -28,6 +29,7 @@ export function SelectedWorksSection({
 
   const perf = usePerformanceProfile();
   const isNearPreview = useNearViewport(previewStageRef, "550px 0px");
+  const touchGate = useTouchInteractGate(previewStageRef);
 
   const activeProject =
     list.find((p) => p.id === activeId) ?? list[0];
@@ -192,10 +194,14 @@ export function SelectedWorksSection({
           {/* Right: Sticky Live 3D Specimen Preview with Floating Smoked Glass Overlays */}
           <div ref={previewStageRef} className="anim-stage-reveal min-w-0 lg:sticky lg:top-24">
             <div
-              className={`relative aspect-[4/4.6] w-full overflow-hidden rounded-2xl border transition-colors duration-300 sm:aspect-[4/4.3] ${
+              className={`relative aspect-[4/4.6] w-full overflow-hidden rounded-2xl border transition-all duration-300 sm:aspect-[4/4.3] ${
                 previewDark
                   ? "gather-surface-dark border-black/25 shadow-[0_24px_54px_-16px_rgba(6,8,16,0.42)]"
                   : "gather-surface-light border-black/20 shadow-[0_24px_54px_-16px_rgba(13,14,18,0.18)]"
+              } ${
+                touchGate.isTouchDevice && touchGate.active
+                  ? "ring-2 ring-[#0038FF]/70"
+                  : ""
               }`}
             >
               <div className="absolute inset-0">
@@ -216,7 +222,7 @@ export function SelectedWorksSection({
                     travelMode={activeProject.preset === "terrain" ? "melt" : "swarm"}
                     draw={{ track: true, links: true, scan: false, marks: true }}
                     paused={previewPaused}
-                    interactive
+                    interactive={touchGate.interactive}
                     showHud
                     showGimbal
                     cameraDistance={3.9}
@@ -271,6 +277,15 @@ export function SelectedWorksSection({
 
               {/* Floating Bottom Touch-Friendly Specimen Switcher + Caption Bar */}
               <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 z-10 flex flex-col gap-1.5 sm:inset-x-3 sm:bottom-3 sm:gap-2">
+                <div className="flex justify-end">
+                  <TouchInteractPill
+                    visible={touchGate.isTouchDevice}
+                    active={touchGate.active}
+                    lightSurface={!previewDark}
+                    onToggle={touchGate.toggle}
+                  />
+                </div>
+
                 {/* Direct 1-Tap Specimen Selector (2x2 on 320px, 4-col bar on >=380px) */}
                 <div
                   role="tablist"

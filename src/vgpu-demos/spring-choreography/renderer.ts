@@ -297,6 +297,7 @@ export function createRenderer({
     const start = pressed;
     pressed = undefined;
     if (
+      event.type !== "pointercancel" &&
       start &&
       event.target === canvas &&
       Math.hypot(event.clientX - start.x, event.clientY - start.y) < 8
