@@ -1,7 +1,9 @@
 // Document-anchored free-roaming quadruped companions powered by vgpu/scene + FABRIK IK.
-// Robots live on the webpage surface: scrolling down leaves them behind above the viewport,
-// and after leaving view they naturally trot back into your current section from any screen edge.
-// Hovering reveals each bot's callsign & role; clicking triggers real FABRIK IK tricks (bow, wiggle, hop, scan+zoom).
+// - Scroll-anchored 1:1 on the webpage surface; left behind when scrolling and re-enters from any edge.
+// - Hover reveals each bot's callsign HUD badge (`AXIS-01`, `DATUM-02`).
+// - Click triggers 4 physical FABRIK IK tricks (`SALUTE BOW`, `HAPPY WIGGLE`, `SPRING HOP!`, `LIDAR SCAN · ZOOM`).
+// - Click & drag lifts the robot into mid-air with frantically paddling legs & pendulum inertia;
+//   releasing drops it under gravity with a suspension-squash + shake-it-off landing reaction & shockwave ring.
 
 import { clamp, type Vec3 } from "math";
 import { mulberry32, type Mulberry32 } from "math/random";
@@ -40,6 +42,8 @@ import {
 import {
   createRobot,
   placeRobot,
+  poseAirborneRobot,
+  RIDE_HEIGHT,
   stepRobot,
   type Robot,
   type RobotEmote,
@@ -48,7 +52,7 @@ import { createTerrain, type Terrain } from "./terrain";
 import roamingPartsShader from "./roaming-parts.wgsl";
 import roamingShadowShader from "./roaming-shadow.wgsl";
 
-export type BotTrickKind = "bow" | "wiggle" | "hop" | "scan";
+export type BotTrickKind = "bow" | "wiggle" | "hop" | "scan" | "land";
 
 export interface RoamingBotMeta {
   readonly id: number;
@@ -65,13 +69,13 @@ export interface BotScreenTelemetry {
   readonly index: number;
   readonly name: string;
   readonly role: string;
-  /** True when the floating HUD tag should render (hovered OR performing an interactive trick). */
+  /** True when the floating HUD tag should render (hovered, carried, falling, or performing a trick). */
   readonly visible: boolean;
   /** True while pointer is actively hovering this robot. */
   readonly hovered: boolean;
-  /** Currently executing trick kind, or null. */
+  /** Active trick kind when performing an interactive reaction, else null. */
   readonly trick: BotTrickKind | null;
-  /** Short HUD callout text for the active trick, or null. */
+  /** Short HUD callout text for the active trick or airlift state, else null. */
   readonly trickLabel: string | null;
   /** Viewport CSS px coordinates directly above the robot's chassis for its floating tag. */
   readonly labelX: number;
@@ -113,10 +117,20 @@ const SPAWN_NDC_Y = 1.11;
 
 const HOVER_HIT_RADIUS_PX = 58;
 const TOUCH_HIT_RADIUS_PX = 66;
+const DRAG_THRESHOLD_PX = 7;
+/** World height when lifted by the user (~70px clear floating air gap above the floor shadow). */
+const LIFT_HEIGHT = 1.68;
+const GRAVITY = 15.8;
+
 const UI_INTERACTIVE_SELECTOR =
   "a, button, input, textarea, select, dialog[open], canvas.touch-none, [role='tab'], [role='button']";
 
-const TRICK_ORDER: readonly BotTrickKind[] = ["bow", "wiggle", "hop", "scan"];
+const CLICK_TRICKS: readonly ("bow" | "wiggle" | "hop" | "scan")[] = [
+  "bow",
+  "wiggle",
+  "hop",
+  "scan",
+];
 
 const TRICK_CONFIG: Record<
   BotTrickKind,
@@ -126,6 +140,7 @@ const TRICK_CONFIG: Record<
   wiggle: { duration: 1.75, label: "HAPPY WIGGLE" },
   hop: { duration: 1.25, label: "SPRING HOP!" },
   scan: { duration: 2.05, label: "LIDAR SCAN · ZOOM" },
+  land: { duration: 1.35, label: "TOUCHDOWN · RECOVERING" },
 };
 
 interface ActiveTrick {
@@ -134,6 +149,30 @@ interface ActiveTrick {
   duration: number;
   label: string;
   zoomStarted: boolean;
+}
+
+interface AirborneState {
+  mode: "carried" | "falling";
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  heading: number;
+  tiltRight: number;
+  tiltForward: number;
+  kickTime: number;
+  targetX: number;
+  targetZ: number;
+}
+
+interface PendingGrab {
+  readonly botIndex: number;
+  readonly pointerId: number;
+  readonly startX: number;
+  readonly startY: number;
+  dragging: boolean;
 }
 
 function smoothstep01(edge0: number, edge1: number, x: number): number {
@@ -200,7 +239,6 @@ function evaluateTrickEmote(
   out.footLift = 0;
 
   if (trick.kind === "bow") {
-    // Smooth architectural salute bow: front shoulders lower deeply while rear stays tall
     const enter = smoothstep01(0, 0.24, u);
     const exit = 1 - smoothstep01(0.72, 1.0, u);
     const env = enter * exit;
@@ -211,7 +249,6 @@ function evaluateTrickEmote(
   }
 
   if (trick.kind === "wiggle") {
-    // Excited puppy-dog hip/body wiggle with all 4 FABRIK knees flexing alternately
     const env = smoothstep01(0, 0.14, u) * (1 - smoothstep01(0.82, 1.0, u));
     const wave = Math.sin(trick.elapsed * 22.0);
     out.rollOffset = wave * 0.25 * env;
@@ -221,7 +258,6 @@ function evaluateTrickEmote(
   }
 
   if (trick.kind === "hop") {
-    // 3-phase spring-loaded jump: crouch anticipation -> parabolic airborne hop -> damped landing
     if (u < 0.24) {
       const p = Math.sin((u / 0.24) * (Math.PI * 0.5));
       out.heightOffset = -0.13 * p;
@@ -239,6 +275,24 @@ function evaluateTrickEmote(
       const land = Math.sin(p * Math.PI);
       out.heightOffset = -0.075 * land;
       out.pitchOffset = -0.07 * land;
+    }
+    return;
+  }
+
+  if (trick.kind === "land") {
+    // Impact touchdown: heavy 4-leg suspension squash -> elastic rebound -> rapid shake-it-off shiver
+    if (u < 0.3) {
+      const p = u / 0.3;
+      const squash = Math.sin(p * Math.PI);
+      out.heightOffset = -0.16 * squash;
+      out.pitchOffset = -0.14 * squash;
+    } else {
+      const su = (u - 0.3) / 0.7;
+      const env = smoothstep01(0, 0.16, su) * (1 - smoothstep01(0.75, 1.0, su));
+      const rebound = su < 0.18 ? Math.sin((su / 0.18) * Math.PI) * 0.045 : 0;
+      out.heightOffset = rebound - 0.03 * env;
+      out.rollOffset = Math.sin(trick.elapsed * 30.0) * 0.23 * env;
+      out.pitchOffset = 0.08 * env;
     }
     return;
   }
@@ -289,6 +343,10 @@ export function createRoamingRenderer({
     { length: botCount },
     () => null
   );
+  const airborne: (AirborneState | null)[] = Array.from(
+    { length: botCount },
+    () => null
+  );
   const push = new Float32Array(botCount * 2);
   const shadowData = new Float32Array(botCount * 4);
   const shadowScale = new Float32Array(botCount).fill(1);
@@ -327,6 +385,9 @@ export function createRoamingRenderer({
 
   let worldZPerPixel = 0.012;
   let hoveredBot = -1;
+  let pendingGrab: PendingGrab | null = null;
+  let suppressClickUntil = 0;
+  let prevBodyUserSelect: string | null = null;
   let pointerClientX = -9999;
   let pointerClientY = -9999;
   let pointerActive = false;
@@ -368,22 +429,48 @@ export function createRoamingRenderer({
     footLift: 0,
   };
 
-  function setBotHoverCursorFlag(isHovering: boolean): void {
+  function setBotCursorFlags(isHovering: boolean, isGrabbing: boolean): void {
     if (typeof document === "undefined") return;
-    const next = isHovering ? "true" : "false";
-    if (document.documentElement.dataset.botHover !== next) {
-      document.documentElement.dataset.botHover = next;
+    const nextHover = isHovering ? "true" : "false";
+    const nextGrab = isGrabbing ? "true" : "false";
+    if (
+      document.documentElement.dataset.botHover !== nextHover ||
+      document.documentElement.dataset.botGrab !== nextGrab
+    ) {
+      document.documentElement.dataset.botHover = nextHover;
+      document.documentElement.dataset.botGrab = nextGrab;
       window.dispatchEvent(new Event("goddev:bot-hover"));
     }
   }
 
-  function ndcToFloor(ndcX: number, ndcY: number): [number, number] | null {
+  function setBodyNoSelect(active: boolean): void {
+    if (typeof document === "undefined") return;
+    if (active) {
+      if (prevBodyUserSelect === null) {
+        prevBodyUserSelect = document.body.style.userSelect;
+      }
+      document.body.style.userSelect = "none";
+    } else if (prevBodyUserSelect !== null) {
+      document.body.style.userSelect = prevBodyUserSelect;
+      prevBodyUserSelect = null;
+    }
+  }
+
+  function ndcToPlane(
+    ndcX: number,
+    ndcY: number,
+    planeY = 0
+  ): [number, number] | null {
     const aspect = outputWidth / Math.max(1, outputHeight);
     cameraRay(pose, lens, aspect, ndcX, ndcY, rayOrigin, rayDir);
     if (Math.abs(rayDir[1]) < 1e-4) return null;
-    const t = -rayOrigin[1] / rayDir[1];
+    const t = (planeY - rayOrigin[1]) / rayDir[1];
     if (t <= 0) return null;
     return [rayOrigin[0] + rayDir[0] * t, rayOrigin[2] + rayDir[2] * t];
+  }
+
+  function ndcToFloor(ndcX: number, ndcY: number): [number, number] | null {
+    return ndcToPlane(ndcX, ndcY, 0);
   }
 
   /** Project a 3D world point (x, y, z) into exact screen NDC [-1, 1]^2. */
@@ -428,15 +515,33 @@ export function createRoamingRenderer({
     return Math.abs(nx) <= 0.88 && Math.abs(ny) <= 0.86;
   }
 
+  function clientToPlane(
+    clientX: number,
+    clientY: number,
+    planeY = 0,
+    clampX = 0.84,
+    clampY = 0.82
+  ): [number, number] | null {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const ndcX = clamp(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -clampX,
+      clampX
+    );
+    const ndcY = clamp(
+      1 - ((clientY - rect.top) / rect.height) * 2,
+      -clampY,
+      clampY - 0.04
+    );
+    return ndcToPlane(ndcX, ndcY, planeY);
+  }
+
   function clientToFloor(
     clientX: number,
     clientY: number
   ): [number, number] | null {
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return null;
-    const ndcX = clamp(((clientX - rect.left) / rect.width) * 2 - 1, -0.84, 0.84);
-    const ndcY = clamp(1 - ((clientY - rect.top) / rect.height) * 2, -0.82, 0.78);
-    return ndcToFloor(ndcX, ndcY);
+    return clientToPlane(clientX, clientY, 0, 0.84, 0.82);
   }
 
   function updateScrollCalibration(): void {
@@ -453,7 +558,7 @@ export function createRoamingRenderer({
     }
   }
 
-  /** Find which visible robot (if any) sits under a CSS client coordinate. */
+  /** Find which visible robot (if any) sits under a CSS client coordinate (works grounded & mid-air). */
   function hitTestBotAt(
     clientX: number,
     clientY: number,
@@ -465,10 +570,11 @@ export function createRoamingRenderer({
     let bestDist = radiusPx;
     for (let i = 0; i < botCount; i++) {
       const r = robots[i]!;
-      if (offscreenNdcDistance(r) > 0.05) continue;
+      const isAir = Boolean(airborne[i]);
+      if (!isAir && offscreenNdcDistance(r) > 0.05) continue;
       const [sx, sy] = projectWorldToCss(
         r.position[0],
-        r.position[1] * 0.65,
+        isAir ? r.position[1] : r.position[1] * 0.65,
         r.position[2],
         rect
       );
@@ -509,10 +615,6 @@ export function createRoamingRenderer({
     return ndcToFloor(nx, ny) ?? [goRight ? 8 : -8, 0];
   }
 
-  /**
-   * Spawn a robot right outside the exact pixel edge of the current viewport (left, right, bottom, or top)
-   * facing directly toward its inward target so it smoothly trots into view within ~0.4s.
-   */
   function enterFromEdge(
     index: number,
     forcedTarget?: readonly [number, number],
@@ -579,6 +681,7 @@ export function createRoamingRenderer({
     robot.phase = savedPhase;
 
     activeTricks[index] = null;
+    airborne[index] = null;
     robot.goal[0] = target[0];
     robot.goal[1] = target[1];
     robot.arrived = false;
@@ -595,8 +698,7 @@ export function createRoamingRenderer({
       const rng = randoms[i]!;
       robot.palette = i === 1 ? 1 : 0;
       robot.phase = i * 0.37;
-      // Stagger starting tricks so Bot 0 starts with Bow & Bot 1 starts with Wiggle/Hop variety
-      nextTrickCursor[i] = i % TRICK_ORDER.length;
+      nextTrickCursor[i] = i % CLICK_TRICKS.length;
       if (i === 0) {
         const start = ndcToFloor(-0.68, -0.58) ?? [-4.2, 2.8];
         const wp = pickWaypoint(i);
@@ -616,12 +718,17 @@ export function createRoamingRenderer({
     }
   }
 
-  function triggerBotTrick(botIndex: number): void {
+  function triggerBotTrick(botIndex: number, forcedKind?: BotTrickKind): void {
     const robot = robots[botIndex]!;
     const meta = botMetas[botIndex]!;
-    const cursor = nextTrickCursor[botIndex]!;
-    const kind = TRICK_ORDER[cursor % TRICK_ORDER.length]!;
-    nextTrickCursor[botIndex] = (cursor + 1) % TRICK_ORDER.length;
+    let kind: BotTrickKind;
+    if (forcedKind) {
+      kind = forcedKind;
+    } else {
+      const cursor = nextTrickCursor[botIndex]!;
+      kind = CLICK_TRICKS[cursor % CLICK_TRICKS.length]!;
+      nextTrickCursor[botIndex] = (cursor + 1) % CLICK_TRICKS.length;
+    }
 
     const cfg = TRICK_CONFIG[kind];
     activeTricks[botIndex] = {
@@ -632,12 +739,11 @@ export function createRoamingRenderer({
       zoomStarted: false,
     };
 
-    // Pause current wander during stationary tricks so legs bend cleanly in place
     if (kind !== "scan") {
       robot.goal[0] = robot.position[0];
       robot.goal[1] = robot.position[2];
       robot.arrived = true;
-      idleTimers[botIndex] = 0.7;
+      idleTimers[botIndex] = kind === "land" ? 2.2 : 0.7;
     } else {
       robot.goal[0] = robot.position[0];
       robot.goal[1] = robot.position[2];
@@ -647,7 +753,7 @@ export function createRoamingRenderer({
     const rect = canvas.getBoundingClientRect();
     const [sx, sy] = projectWorldToCss(
       robot.position[0],
-      0.08,
+      0.06,
       robot.position[2],
       rect
     );
@@ -659,6 +765,55 @@ export function createRoamingRenderer({
       x: sx,
       y: sy,
     });
+  }
+
+  function startCarry(botIndex: number, clientX: number, clientY: number): void {
+    const robot = robots[botIndex]!;
+    const hit = clientToPlane(clientX, clientY, LIFT_HEIGHT, 0.92, 0.88);
+    const tx = hit ? hit[0] : robot.position[0];
+    const tz = hit ? hit[1] : robot.position[2];
+
+    activeTricks[botIndex] = null;
+    returning[botIndex] = 0;
+    offscreenTime[botIndex] = 0;
+
+    const existing = airborne[botIndex];
+    airborne[botIndex] = {
+      mode: "carried",
+      x: existing ? existing.x : robot.position[0],
+      y: Math.max(RIDE_HEIGHT + 0.08, existing ? existing.y : robot.position[1]),
+      z: existing ? existing.z : robot.position[2],
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      heading: existing ? existing.heading : robot.heading.value,
+      tiltRight: existing ? existing.tiltRight : 0,
+      tiltForward: existing ? existing.tiltForward : 0.12,
+      kickTime: existing ? existing.kickTime : 0,
+      targetX: tx,
+      targetZ: tz,
+    };
+
+    setBodyNoSelect(true);
+    try {
+      window.getSelection()?.removeAllRanges();
+    } catch {
+      // Ignore selection clear errors
+    }
+    setBotCursorFlags(true, true);
+  }
+
+  function releaseCarry(botIndex: number): void {
+    const air = airborne[botIndex];
+    if (air && air.mode === "carried") {
+      air.mode = "falling";
+      // Carry over gentle, bounded horizontal toss momentum so dropping or flicking feels physical
+      air.vx = clamp(air.vx * 0.3, -3.2, 3.2);
+      air.vz = clamp(air.vz * 0.3, -3.2, 3.2);
+      air.vy = Math.min(0.6, Math.max(-0.5, 0.35));
+    }
+    setBodyNoSelect(false);
+    setBotCursorFlags(hoveredBot >= 0, false);
   }
 
   function closestEdgeForClient(clientX: number, clientY: number): 0 | 1 | 2 | 3 {
@@ -684,8 +839,8 @@ export function createRoamingRenderer({
     let bestDist = Infinity;
     for (let i = 0; i < botCount; i++) {
       const r = robots[i]!;
+      if (airborne[i] || activeTricks[i]) continue;
       if (offscreenNdcDistance(r) > 0.16) continue;
-      if (activeTricks[i]) continue;
       const d = Math.hypot(r.position[0] - hit[0], r.position[2] - hit[1]);
       if (d < bestDist) {
         bestDist = d;
@@ -702,9 +857,8 @@ export function createRoamingRenderer({
       return;
     }
 
-    // If any bot is off-screen, summon it right from the nearest edge
     for (let i = 0; i < botCount; i++) {
-      if (offscreenNdcDistance(robots[i]!) > 0.16) {
+      if (!airborne[i] && offscreenNdcDistance(robots[i]!) > 0.16) {
         enterFromEdge(i, hit, closestEdgeForClient(clientX, clientY));
         return;
       }
@@ -718,12 +872,20 @@ export function createRoamingRenderer({
       return;
     }
 
-    // 1. Direct click/tap on a robot triggers its interactive FABRIK IK trick
+    // 1. Direct press on a robot arms click-vs-lift disambiguation
     const hitRadius =
       event.pointerType === "touch" ? TOUCH_HIT_RADIUS_PX : HOVER_HIT_RADIUS_PX;
     const hitBot = hitTestBotAt(event.clientX, event.clientY, hitRadius);
     if (hitBot >= 0) {
-      triggerBotTrick(hitBot);
+      pendingGrab = {
+        botIndex: hitBot,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        dragging: false,
+      };
+      // Prevent native text highlight from starting during the first few pixels of a bot drag
+      setBodyNoSelect(true);
       return;
     }
 
@@ -733,11 +895,43 @@ export function createRoamingRenderer({
 
   const onWindowPointerMove = (event: PointerEvent) => {
     if (!event.isPrimary) return;
-    const target = event.target instanceof Element ? event.target : null;
-    pointerOverUi = Boolean(target?.closest(UI_INTERACTIVE_SELECTOR));
     pointerClientX = event.clientX;
     pointerClientY = event.clientY;
     pointerActive = event.pointerType === "mouse";
+
+    // Handle armed press -> lift transition and active mid-air dragging
+    if (pendingGrab && event.pointerId === pendingGrab.pointerId) {
+      if (!pendingGrab.dragging) {
+        const moved = Math.hypot(
+          event.clientX - pendingGrab.startX,
+          event.clientY - pendingGrab.startY
+        );
+        if (moved >= DRAG_THRESHOLD_PX) {
+          pendingGrab.dragging = true;
+          startCarry(pendingGrab.botIndex, event.clientX, event.clientY);
+        }
+      }
+      if (pendingGrab.dragging) {
+        const air = airborne[pendingGrab.botIndex];
+        if (air && air.mode === "carried") {
+          const hit = clientToPlane(
+            event.clientX,
+            event.clientY,
+            LIFT_HEIGHT,
+            0.92,
+            0.88
+          );
+          if (hit) {
+            air.targetX = hit[0];
+            air.targetZ = hit[1];
+          }
+        }
+        return;
+      }
+    }
+
+    const target = event.target instanceof Element ? event.target : null;
+    pointerOverUi = Boolean(target?.closest(UI_INTERACTIVE_SELECTOR));
 
     if (event.pointerType !== "mouse") return;
     const now = event.timeStamp;
@@ -751,13 +945,14 @@ export function createRoamingRenderer({
           event.clientX - lastPointerClient[0],
           event.clientY - lastPointerClient[1]
         ) / Math.max(8, now - lastPointerTime);
-      // Only whip-dodge when swiping VERY fast past a bot that isn't hovered/performing a trick
       if (speed > 2.35 && hoveredBot < 0) {
         const hit = clientToFloor(event.clientX, event.clientY);
         if (hit) {
           for (let i = 0; i < botCount; i++) {
             const r = robots[i]!;
-            if (activeTricks[i] || offscreenNdcDistance(r) > 0.05) continue;
+            if (airborne[i] || activeTricks[i] || offscreenNdcDistance(r) > 0.05) {
+              continue;
+            }
             const dx = r.position[0] - hit[0];
             const dz = r.position[2] - hit[1];
             const d = Math.hypot(dx, dz);
@@ -777,19 +972,65 @@ export function createRoamingRenderer({
     lastPointerTime = now;
   };
 
+  const finishPendingGrab = (pointerId?: number, cancelled = false) => {
+    if (!pendingGrab) return;
+    if (pointerId !== undefined && pendingGrab.pointerId !== pointerId) return;
+    const { botIndex, dragging } = pendingGrab;
+    pendingGrab = null;
+
+    if (dragging) {
+      suppressClickUntil = performance.now() + 90;
+      releaseCarry(botIndex);
+    } else {
+      setBodyNoSelect(false);
+      if (!cancelled && !airborne[botIndex]) {
+        // Short press-and-release without dragging -> run interactive click trick!
+        triggerBotTrick(botIndex);
+      }
+    }
+  };
+
+  const onWindowTouchMove = (event: TouchEvent) => {
+    if (pendingGrab?.dragging && event.cancelable) {
+      event.preventDefault();
+    }
+  };
+
+  const onWindowPointerUp = (event: PointerEvent) => {
+    finishPendingGrab(event.pointerId, false);
+  };
+
+  const onWindowPointerCancel = (event: PointerEvent) => {
+    finishPendingGrab(event.pointerId, true);
+  };
+
+  const onWindowBlur = () => {
+    finishPendingGrab(undefined, true);
+  };
+
+  const onWindowClickCapture = (event: MouseEvent) => {
+    // Prevent accidental link/button clicks right when releasing a dragged robot over UI
+    if (performance.now() < suppressClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+
   const onDocumentMouseLeave = () => {
     pointerActive = false;
     pointerOverUi = false;
-    if (hoveredBot !== -1) {
+    if (!pendingGrab?.dragging && hoveredBot !== -1) {
       hoveredBot = -1;
-      setBotHoverCursorFlag(false);
+      setBotCursorFlags(false, false);
     }
   };
 
   function stepSimulation(): void {
     push.fill(0);
     for (let a = 0; a < botCount; a++) {
+      if (airborne[a]) continue;
       for (let b = a + 1; b < botCount; b++) {
+        if (airborne[b]) continue;
         const ra = robots[a]!;
         const rb = robots[b]!;
         const dx = rb.position[0] - ra.position[0];
@@ -809,6 +1050,96 @@ export function createRoamingRenderer({
 
     for (let i = 0; i < botCount; i++) {
       const robot = robots[i]!;
+      const air = airborne[i];
+
+      // --- Airborne state: lifted in mid-air OR falling under gravity ---
+      if (air) {
+        air.kickTime += FIXED_DT;
+
+        if (air.mode === "carried") {
+          const follow = 1 - Math.exp(-FIXED_DT * 18);
+          const dx = (air.targetX - air.x) * follow;
+          const dz = (air.targetZ - air.z) * follow;
+          air.vx = air.vx * 0.7 + (dx / FIXED_DT) * 0.3;
+          air.vz = air.vz * 0.7 + (dz / FIXED_DT) * 0.3;
+          air.x += dx;
+          air.z += dz;
+
+          const hoverBob = Math.sin(air.kickTime * 6.4) * 0.045;
+          const targetY = LIFT_HEIGHT + hoverBob;
+          air.y += (targetY - air.y) * (1 - Math.exp(-FIXED_DT * 14));
+
+          // Pendulum inertia tilt in the robot's heading frame
+          const c = Math.cos(air.heading);
+          const s = Math.sin(air.heading);
+          const localRightVel = air.vx * c - air.vz * s;
+          const localFwdVel = air.vx * s + air.vz * c;
+          const desiredRight =
+            clamp(-localRightVel * 0.085, -0.34, 0.34) +
+            Math.sin(air.kickTime * 10.5) * 0.045;
+          const desiredFwd = clamp(-localFwdVel * 0.085, -0.28, 0.28) + 0.13;
+          air.tiltRight += (desiredRight - air.tiltRight) * 0.22;
+          air.tiltForward += (desiredFwd - air.tiltForward) * 0.22;
+          air.heading += clamp(localRightVel * 0.007, -0.024, 0.024);
+
+          poseAirborneRobot(
+            robot,
+            air.x,
+            air.y,
+            air.z,
+            air.heading,
+            air.tiltRight,
+            air.tiltForward,
+            air.kickTime,
+            "dangle"
+          );
+          shadowScale[i] = clamp(
+            1.0 - (air.y - RIDE_HEIGHT) * 0.38,
+            0.52,
+            1.0
+          );
+          continue;
+        }
+
+        // Falling under gravity
+        air.vy -= GRAVITY * FIXED_DT;
+        air.x += air.vx * FIXED_DT;
+        air.z += air.vz * FIXED_DT;
+        air.vx *= 0.965;
+        air.vz *= 0.965;
+        air.y += air.vy * FIXED_DT;
+        air.tiltRight *= 0.88;
+        air.tiltForward += (-0.09 - air.tiltForward) * 0.14;
+
+        if (air.y <= RIDE_HEIGHT) {
+          // Touchdown! Re-plant all 4 feet cleanly onto the concrete page & trigger squash+shake recovery
+          airborne[i] = null;
+          const savedPalette = robot.palette;
+          const savedPhase = robot.phase;
+          placeRobot(robot, terrain, air.x, air.z, air.heading);
+          robot.palette = savedPalette;
+          robot.phase = savedPhase;
+          shadowScale[i] = 1.15;
+          triggerBotTrick(i, "land");
+          continue;
+        }
+
+        poseAirborneRobot(
+          robot,
+          air.x,
+          air.y,
+          air.z,
+          air.heading,
+          air.tiltRight,
+          air.tiltForward,
+          air.kickTime,
+          "brace"
+        );
+        shadowScale[i] = clamp(1.0 - (air.y - RIDE_HEIGHT) * 0.38, 0.52, 1.0);
+        continue;
+      }
+
+      // --- Grounded state ---
       const offNdc = offscreenNdcDistance(robot);
 
       if (returning[i] === 1) {
@@ -832,7 +1163,6 @@ export function createRoamingRenderer({
         offscreenTime[i] = 0;
       }
 
-      // Advance active interactive trick (if any)
       let trick = activeTricks[i];
       let emoteArg: RobotEmote | undefined;
       let pace = returning[i] === 1 ? 1.32 : 1.18;
@@ -841,20 +1171,31 @@ export function createRoamingRenderer({
       if (trick) {
         trick.elapsed += FIXED_DT;
         if (trick.elapsed >= trick.duration) {
+          const wasLanding = trick.kind === "land";
           activeTricks[i] = null;
           trick = null;
           shadowScale[i] = 1;
-          // After finishing a trick, resume natural patrol shortly
-          const next = pickWaypoint(i);
-          robot.goal[0] = next[0];
-          robot.goal[1] = next[1];
-          robot.arrived = false;
-          idleTimers[i] = 1.4;
+          if (wasLanding) {
+            // Stay calmly near the newly dropped spot for a moment so it doesn't rush back over text
+            robot.goal[0] = robot.position[0];
+            robot.goal[1] = robot.position[2];
+            robot.arrived = true;
+            idleTimers[i] = 2.0;
+          } else {
+            const next = pickWaypoint(i);
+            robot.goal[0] = next[0];
+            robot.goal[1] = next[1];
+            robot.arrived = false;
+            idleTimers[i] = 1.4;
+          }
         } else {
           evaluateTrickEmote(trick, scratchEmote);
           emoteArg = scratchEmote;
-          // Subtly adjust contact shadow radius as the robot jumps or bows
-          shadowScale[i] = clamp(1.0 - scratchEmote.heightOffset * 1.45, 0.65, 1.16);
+          shadowScale[i] = clamp(
+            1.0 - scratchEmote.heightOffset * 1.45,
+            0.65,
+            1.18
+          );
 
           if (trick.kind === "scan") {
             const u = trick.elapsed / trick.duration;
@@ -875,14 +1216,13 @@ export function createRoamingRenderer({
           }
         }
       } else if (hoveredBot === i && offNdc === 0) {
-        // Gentle friendly attention when user hovers over the robot
         scratchEmote.heightOffset = -0.025;
         scratchEmote.pitchOffset = 0.11;
         scratchEmote.rollOffset = 0;
         scratchEmote.footLift = 0;
         emoteArg = scratchEmote;
         shadowScale[i] = 1.03;
-        pace = 0.3;
+        pace = 0.28;
       } else {
         shadowScale[i] = 1;
       }
@@ -935,15 +1275,17 @@ export function createRoamingRenderer({
   function updateHoverAndTelemetry(): void {
     const rect = canvas.getBoundingClientRect();
     const validRect = rect.width > 0 && rect.height > 0;
+    const isCarrying = Boolean(pendingGrab?.dragging);
 
-    const nextHover =
-      validRect && pointerActive && !pointerOverUi
+    const nextHover = isCarrying
+      ? pendingGrab!.botIndex
+      : validRect && pointerActive && !pointerOverUi
         ? hitTestBotAt(pointerClientX, pointerClientY, HOVER_HIT_RADIUS_PX)
         : -1;
 
     if (nextHover !== hoveredBot) {
       hoveredBot = nextHover;
-      setBotHoverCursorFlag(hoveredBot >= 0);
+      setBotCursorFlags(hoveredBot >= 0, isCarrying);
     }
 
     if (!onTelemetry) return;
@@ -951,20 +1293,29 @@ export function createRoamingRenderer({
     for (let i = 0; i < botCount; i++) {
       const r = robots[i]!;
       const item = telemetry[i]!;
+      const air = airborne[i];
       const trick = activeTricks[i];
       const isHovered = hoveredBot === i;
-      const isVisibleOnScreen = validRect && offscreenNdcDistance(r) <= 0.04;
-      const showBadge = isVisibleOnScreen && (isHovered || Boolean(trick));
+      const isVisibleOnScreen =
+        validRect && (Boolean(air) || offscreenNdcDistance(r) <= 0.04);
+      const showBadge =
+        isVisibleOnScreen && (isHovered || Boolean(trick) || Boolean(air));
 
       item.hovered = isHovered;
       item.trick = trick ? trick.kind : null;
-      item.trickLabel = trick ? trick.label : null;
+      item.trickLabel = air
+        ? air.mode === "carried"
+          ? "AIRLIFT · WHOA!"
+          : "FREEFALL · BRACING!"
+        : trick
+          ? trick.label
+          : null;
       item.visible = showBadge;
 
       if (showBadge) {
         const [cx, cy] = projectWorldToCss(
           r.position[0],
-          r.position[1] * 0.5,
+          air ? r.position[1] : r.position[1] * 0.5,
           r.position[2],
           rect
         );
@@ -976,7 +1327,7 @@ export function createRoamingRenderer({
         );
         item.centerX = cx;
         item.centerY = cy;
-        item.labelX = clamp(lx, 84, Math.max(84, rect.width - 84));
+        item.labelX = clamp(lx, 96, Math.max(96, rect.width - 96));
         item.labelY = clamp(ly - 14, 78, Math.max(78, rect.height - 44));
       }
     }
@@ -1042,7 +1393,7 @@ export function createRoamingRenderer({
     lastFrameAt = now;
     renderTime += rawDt;
 
-    // Anchor robots directly to the webpage document scroll every frame (syncs 1:1 with Lenis & native scroll)
+    // Anchor grounded & falling robots directly to webpage scroll (carried robot stays under cursor)
     const currentScrollY = window.scrollY;
     const deltaScrollY = currentScrollY - lastFrameScrollY;
     lastFrameScrollY = currentScrollY;
@@ -1054,6 +1405,11 @@ export function createRoamingRenderer({
     if (Math.abs(deltaScrollY) > 0.01) {
       const deltaZ = -deltaScrollY * worldZPerPixel;
       for (let i = 0; i < botCount; i++) {
+        const air = airborne[i];
+        if (air?.mode === "carried") continue;
+        if (air?.mode === "falling") {
+          air.z += deltaZ;
+        }
         shiftRobotZ(robots[i]!, deltaZ);
       }
       scrolled = true;
@@ -1131,11 +1487,17 @@ export function createRoamingRenderer({
     if (disposed) return;
     disposed = true;
     stopLoop();
-    setBotHoverCursorFlag(false);
+    setBodyNoSelect(false);
+    setBotCursorFlags(false, false);
     unsubscribeResize?.();
     if (typeof window !== "undefined") {
       window.removeEventListener("pointerdown", onWindowPointerDown);
       window.removeEventListener("pointermove", onWindowPointerMove);
+      window.removeEventListener("pointerup", onWindowPointerUp);
+      window.removeEventListener("pointercancel", onWindowPointerCancel);
+      window.removeEventListener("touchmove", onWindowTouchMove);
+      window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("click", onWindowClickCapture, true);
       document.removeEventListener("mouseleave", onDocumentMouseLeave);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     }
@@ -1228,6 +1590,13 @@ export function createRoamingRenderer({
     window.addEventListener("pointermove", onWindowPointerMove, {
       passive: true,
     });
+    window.addEventListener("pointerup", onWindowPointerUp, { passive: true });
+    window.addEventListener("pointercancel", onWindowPointerCancel, {
+      passive: true,
+    });
+    window.addEventListener("touchmove", onWindowTouchMove, { passive: false });
+    window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("click", onWindowClickCapture, true);
     document.addEventListener("mouseleave", onDocumentMouseLeave);
     document.addEventListener("visibilitychange", onVisibilityChange);
 

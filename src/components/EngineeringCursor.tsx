@@ -45,7 +45,12 @@ export function EngineeringCursor() {
         prevMode = mode;
         dot.dataset.mode = mode;
         ring.dataset.mode = mode;
-        label.textContent = mode === "orbit" ? "DRAG" : "";
+        label.textContent =
+          mode === "orbit"
+            ? document.documentElement.dataset.botGrab === "true"
+              ? "LIFT"
+              : "DRAG"
+            : "";
       }
       if (onDark !== prevDark) {
         prevDark = onDark;
@@ -116,7 +121,10 @@ export function EngineeringCursor() {
         )
       );
 
-      if (el.closest("canvas.touch-none")) {
+      if (
+        document.documentElement.dataset.botGrab === "true" ||
+        el.closest("canvas.touch-none")
+      ) {
         mode = "orbit";
       } else if (
         document.documentElement.dataset.botHover === "true" ||
@@ -131,12 +139,16 @@ export function EngineeringCursor() {
     const onBotHoverChange = () => {
       lastTarget = null;
       if (visible) {
-        mode =
-          document.documentElement.dataset.botHover === "true"
-            ? "pointer"
-            : mode === "pointer"
-              ? "default"
-              : mode;
+        if (document.documentElement.dataset.botGrab === "true") {
+          mode = "orbit";
+          label.textContent = "LIFT";
+        } else if (document.documentElement.dataset.botHover === "true") {
+          mode = "pointer";
+          label.textContent = "";
+        } else if (mode === "pointer" || mode === "orbit") {
+          mode = "default";
+          label.textContent = "";
+        }
         syncStateAttributes();
       }
     };

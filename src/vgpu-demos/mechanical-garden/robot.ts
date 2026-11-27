@@ -301,6 +301,58 @@ function solveLegs(robot: Robot, footLift = 0): void {
   }
 }
 
+const airTarget: Vec3 = [0, 0, 0];
+
+/**
+ * Pose a robot suspended in mid-air (picked up or free-falling) with real 4-leg FABRIK IK:
+ * - "dangle": legs hang downward and paddle/kick frantically in diagonal pairs like a lifted puppy.
+ * - "brace": legs extend downward and slightly outward to brace for touchdown.
+ */
+export function poseAirborneRobot(
+  robot: Robot,
+  x: number,
+  y: number,
+  z: number,
+  heading: number,
+  tiltRight: number,
+  tiltForward: number,
+  kickTime: number,
+  mode: "dangle" | "brace"
+): void {
+  robot.position[0] = x;
+  robot.position[1] = y;
+  robot.position[2] = z;
+  robot.heading.value = heading;
+  robot.heading.velocity = 0;
+  robot.speed.value = 0;
+  robot.speed.velocity = 0;
+  robot.velocity[0] = 0;
+  robot.velocity[1] = 0;
+  setRotation(robot, heading, tiltRight, tiltForward);
+
+  for (let leg = 0; leg < LEG_COUNT; leg++) {
+    const spec = LEG_SPECS[leg]!;
+    const isFront = spec.hip[2] > 0;
+    if (mode === "dangle") {
+      // Diagonal pairs kick out of phase with lively fore-aft paddling & knee tuck
+      const phase = kickTime * 15.5 + PAIR[leg]! * Math.PI + (isFront ? 0.35 : 0);
+      const swing = Math.sin(phase);
+      const tuck = Math.max(0, Math.cos(phase));
+      airTarget[0] =
+        spec.hip[0] + spec.side * (HIP_OFFSET + 0.045 + 0.03 * Math.sin(phase * 0.5));
+      airTarget[1] = -(REACH_MAX - 0.09) + tuck * 0.13;
+      airTarget[2] = spec.hip[2] + swing * 0.17 + (isFront ? 0.03 : -0.04);
+    } else {
+      // Bracing for ground contact: legs stretch down & slightly wide to catch the landing
+      airTarget[0] = spec.hip[0] + spec.side * (HIP_OFFSET + 0.055);
+      airTarget[1] = -(REACH_MAX - 0.045);
+      airTarget[2] = spec.hip[2] + (isFront ? 0.065 : -0.055);
+    }
+    vec3.copy(robot.targets[leg]!, airTarget);
+    solveLeg(robot.legs[leg]!, airTarget);
+  }
+}
+
 export interface RobotEmote {
   /** Additive body height offset in world units (negative = crouch/bow, positive = hop). */
   readonly heightOffset?: number;

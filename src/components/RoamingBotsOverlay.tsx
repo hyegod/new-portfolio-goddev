@@ -92,7 +92,7 @@ export function RoamingBotsOverlay() {
             prevVisible[i] = true;
             el.dataset.visible = "true";
           }
-          const nextStatus = bot.trickLabel ?? "CLICK TO INTERACT";
+          const nextStatus = bot.trickLabel ?? "CLICK · DRAG";
           if (statusEl && prevStatus[i] !== nextStatus) {
             prevStatus[i] = nextStatus;
             statusEl.textContent = nextStatus;
@@ -193,7 +193,9 @@ export function RoamingBotsOverlay() {
                 className={`block rounded-full border ${
                   ping.trick === "scan"
                     ? "bot-ping-ring-lg border-dashed border-[#0038FF]"
-                    : "bot-ping-ring border-[#0038FF]"
+                    : ping.trick === "land"
+                      ? "bot-ping-ring-impact border-2 border-[#0038FF]"
+                      : "bot-ping-ring border-[#0038FF]"
                 }`}
               />
               <span className="bot-ping-ring-delayed absolute top-1/2 left-1/2 block -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#6DA4FF]/80" />
@@ -226,7 +228,7 @@ export function RoamingBotsOverlay() {
                     data-active="false"
                     className="bot-hud-status font-mono text-[8.5px] font-semibold tracking-[0.14em] uppercase"
                   >
-                    CLICK TO INTERACT
+                    CLICK · DRAG
                   </span>
                 </div>
                 <span className="mt-0.5 rounded bg-[#0D0E12]/72 px-1.5 py-[1px] font-mono text-[7.5px] tracking-[0.18em] text-white/75 uppercase backdrop-blur-sm">

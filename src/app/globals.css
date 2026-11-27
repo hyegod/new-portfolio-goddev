@@ -840,6 +840,12 @@ dialog.editorial-dialog::backdrop {
   animation: bot-ping-expand 880ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+.bot-ping-ring-impact {
+  width: 136px;
+  height: 88px;
+  animation: bot-ping-expand 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 .bot-ping-ring-delayed {
   width: 72px;
   height: 72px;
