@@ -635,7 +635,7 @@ export function WorksLabSection({
       id="lab"
       ref={sectionRef}
       tabIndex={-1}
-      className="relative mt-14 scroll-mt-24 border-t border-black/12 pt-12 sm:mt-16 sm:pt-14"
+      className="relative mt-14 scroll-mt-24 border-t border-black/12 pt-12 outline-none focus:outline-none sm:mt-16 sm:pt-14"
       aria-labelledby="works-lab-heading"
     >
       {/* Interactive Lab Sub-Header inside Works */}
