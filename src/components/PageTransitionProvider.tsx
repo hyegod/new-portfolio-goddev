@@ -158,39 +158,29 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
       const destClean = destUrl.pathname.replace(/\/+$/, "") || "/";
 
       // Case 1: Same-page section anchor (#about, #skill, #works, #gallery, #contact, #home, #top)
+      // Glide smoothly via Lenis instead of fading & teleporting
       if (destClean === currentClean) {
         if (!destUrl.hash) return;
 
-        // Measure target position BEFORE exit transform shifts the stage
         const targetTop = getHashTargetTop(destUrl.hash);
         if (targetTop === null) return;
 
-        // Already at this section — avoid unnecessary blink
-        if (Math.abs(window.scrollY - targetTop) < 24) {
-          e.preventDefault();
-          return;
-        }
-
-        if (phaseRef.current === "exiting") {
-          e.preventDefault();
-          return;
-        }
-
         e.preventDefault();
-        clearTimers();
-        initiatedByClickRef.current = true;
-        updatePhase("exiting");
+        if (Math.abs(window.scrollY - targetTop) < 12) {
+          return;
+        }
 
         const nextUrl =
           destUrl.hash === "#top" || destUrl.hash === "#home"
             ? `${window.location.pathname}${window.location.search}`
             : `${window.location.pathname}${window.location.search}${destUrl.hash}`;
 
-        pushTimerRef.current = window.setTimeout(() => {
-          window.history.replaceState(null, "", nextUrl);
-          finishEnter(targetTop);
-        }, EXIT_DURATION_MS);
-
+        window.history.replaceState(null, "", nextUrl);
+        window.dispatchEvent(
+          new CustomEvent("portfolio:smooth-scroll", {
+            detail: { hash: destUrl.hash, top: targetTop },
+          })
+        );
         return;
       }
 

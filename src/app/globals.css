@@ -42,6 +42,19 @@ html {
   scroll-behavior: auto; /* Smooth scroll controlled by Lenis */
 }
 
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
 body {
   background-color: var(--paper);
   color: var(--ink);
@@ -140,30 +153,30 @@ body {
   }
 }
 
-/* Modern Web Guidance: Deferred rendering strictly below the fold with remembered intrinsic size */
+/* Modern Web Guidance: Deferred rendering strictly below the fold with calibrated intrinsic size */
 .deferred-section {
   content-visibility: auto;
-  contain-intrinsic-size: auto none auto 780px;
+  contain-intrinsic-size: auto none auto 1180px;
 }
 
 .deferred-slogan {
   content-visibility: auto;
-  contain-intrinsic-size: auto none auto 560px;
+  contain-intrinsic-size: auto none auto 760px;
 }
 
 .deferred-works {
   content-visibility: auto;
-  contain-intrinsic-size: auto none auto 1120px;
+  contain-intrinsic-size: auto none auto 1480px;
 }
 
 .deferred-gallery {
   content-visibility: auto;
-  contain-intrinsic-size: auto none auto 820px;
+  contain-intrinsic-size: auto none auto 1040px;
 }
 
 .deferred-footer {
   content-visibility: auto;
-  contain-intrinsic-size: auto none auto 480px;
+  contain-intrinsic-size: auto none auto 520px;
 }
 
 .deferred-lab {
