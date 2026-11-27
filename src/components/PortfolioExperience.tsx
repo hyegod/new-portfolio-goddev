@@ -61,7 +61,7 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
       gsap.ticker.lagSmoothing(0);
     }
 
-    // Synchronize Lenis immediately when PageTransitionProvider lands on a new route
+    // Synchronize Lenis immediately when PageTransitionProvider lands on a new route or section fade-jump
     const onInstantScroll = (e: Event) => {
       const top = (e as CustomEvent<{ top: number }>).detail?.top ?? 0;
       if (lenis) {
@@ -73,53 +73,7 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
       ScrollTrigger.update();
     };
 
-    // Smoothly glide to same-page #section anchors via Lenis (or native smooth on touch devices)
-    const onSmoothScroll = (e: Event) => {
-      const detail = (e as CustomEvent<{ hash?: string; top?: number }>).detail;
-      const target =
-        detail?.hash === "#top" || detail?.hash === "#home"
-          ? 0
-          : detail?.hash || detail?.top || 0;
-
-      if (lenis) {
-        lenis.resize();
-        const activeLenis = lenis;
-        activeLenis.scrollTo(target, {
-          offset: typeof target === "string" ? -16 : 0,
-          duration: 1.05,
-          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-          onComplete: () => {
-            if (typeof target !== "string") return;
-            const el = document.querySelector<HTMLElement>(target);
-            if (!el) return;
-            // Re-settle cleanly if content-visibility:auto sections expanded during flight
-            const delta = Math.abs(el.getBoundingClientRect().top - 16);
-            if (delta > 24) {
-              activeLenis.resize();
-              activeLenis.scrollTo(el, {
-                offset: -16,
-                duration: 0.42,
-                easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-              });
-            }
-          },
-        });
-      } else {
-        const top =
-          typeof detail?.top === "number"
-            ? detail.top
-            : typeof target === "number"
-              ? target
-              : 0;
-        window.scrollTo({
-          top,
-          behavior: prefersReduced ? "auto" : "smooth",
-        });
-      }
-    };
-
     window.addEventListener("portfolio:instant-scroll", onInstantScroll);
-    window.addEventListener("portfolio:smooth-scroll", onSmoothScroll);
 
     // 3. Slow Cinematic Blur-In Focus Pull + ScrollTrigger Parallax (strictly opt-in under no-preference)
     const mm = gsap.matchMedia();
@@ -417,7 +371,6 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
       ro.disconnect();
       removeScrollFallback?.();
       window.removeEventListener("portfolio:instant-scroll", onInstantScroll);
-      window.removeEventListener("portfolio:smooth-scroll", onSmoothScroll);
       mm.revert();
       if (rafCallback) {
         gsap.ticker.remove(rafCallback);

@@ -36,7 +36,7 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ScrollSpy on the home page; on subpages highlight the matching route
+  // Deterministic ScrollSpy on the home page; on subpages highlight the matching route
   useEffect(() => {
     if (!isHome) {
       if (pathname.startsWith("/works")) {
@@ -50,30 +50,57 @@ export function Navbar() {
     }
 
     const sectionIds = ["home", "about", "skill", "works", "gallery", "contact"];
-    const elements = sectionIds
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => Boolean(el));
+    let rafId = 0;
 
-    if (elements.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        if (visible.length > 0) {
-          const id = visible[0].target.id;
-          setActiveSection(id === "home" ? "" : id);
-        }
-      },
-      {
-        rootMargin: "-28% 0px -55% 0px",
-        threshold: [0.05, 0.25, 0.5],
+    const computeActive = () => {
+      rafId = 0;
+      const nearBottom =
+        window.scrollY + window.innerHeight >=
+        document.documentElement.scrollHeight - 48;
+      if (nearBottom && document.getElementById("contact")) {
+        setActiveSection("contact");
+        return;
       }
-    );
 
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+      const focalY = Math.min(260, Math.max(120, window.innerHeight * 0.32));
+      let current = "";
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= focalY) {
+          current = id === "home" ? "" : id;
+        }
+      }
+      setActiveSection(current);
+    };
+
+    const scheduleCompute = () => {
+      if (!rafId) {
+        rafId = requestAnimationFrame(computeActive);
+      }
+    };
+
+    const onInstantJump = (e: Event) => {
+      const hash = (e as CustomEvent<{ hash?: string }>).detail?.hash;
+      if (hash) {
+        const id = hash.replace(/^#/, "");
+        if (sectionIds.includes(id)) {
+          setActiveSection(id === "home" || id === "top" ? "" : id);
+        }
+      }
+      scheduleCompute();
+    };
+
+    computeActive();
+    window.addEventListener("scroll", scheduleCompute, { passive: true });
+    window.addEventListener("resize", scheduleCompute, { passive: true });
+    window.addEventListener("portfolio:instant-scroll", onInstantJump);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener("scroll", scheduleCompute);
+      window.removeEventListener("resize", scheduleCompute);
+      window.removeEventListener("portfolio:instant-scroll", onInstantJump);
+    };
   }, [isHome, pathname]);
 
   useEffect(() => {

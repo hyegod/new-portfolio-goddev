@@ -17,9 +17,9 @@ const SETTLE_HOLD_MS = 16;
 const ENTER_DURATION_MS = 320;
 const SAFETY_TIMEOUT_MS = 1600;
 
-function snapScrollInstant(top: number) {
+function snapScrollInstant(top: number, hash?: string) {
   window.dispatchEvent(
-    new CustomEvent("portfolio:instant-scroll", { detail: { top } })
+    new CustomEvent("portfolio:instant-scroll", { detail: { top, hash } })
   );
   window.scrollTo({ top, behavior: "auto" });
 }
@@ -61,24 +61,35 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const finishEnter = useCallback(
-    (explicitTop?: number) => {
+    (explicitHash?: string) => {
       window.clearTimeout(safetyTimerRef.current);
       window.clearTimeout(enterTimerRef.current);
       window.clearTimeout(idleTimerRef.current);
 
+      const jumpAndSettle = (hash: string) => {
+        const firstTop = getHashTargetTop(hash);
+        if (firstTop === null) return;
+        snapScrollInstant(firstTop, hash);
+
+        // Re-check 1 frame later while still faded out in case content-visibility:auto sections expanded
+        requestAnimationFrame(() => {
+          const settledTop = getHashTargetTop(hash);
+          if (settledTop !== null && Math.abs(settledTop - window.scrollY) > 6) {
+            snapScrollInstant(settledTop, hash);
+          }
+        });
+      };
+
       requestAnimationFrame(() => {
-        if (typeof explicitTop === "number") {
-          snapScrollInstant(explicitTop);
+        if (explicitHash) {
+          jumpAndSettle(explicitHash);
         } else {
           const hash = pendingHashRef.current;
           if (hash) {
-            const top = getHashTargetTop(hash);
-            if (top !== null) {
-              snapScrollInstant(top);
-            }
+            jumpAndSettle(hash);
             pendingHashRef.current = "";
           } else if (initiatedByClickRef.current) {
-            snapScrollInstant(0);
+            snapScrollInstant(0, "#home");
           }
         }
 
@@ -91,7 +102,7 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
               updatePhase("idle");
             }, ENTER_DURATION_MS + 25);
           });
-        }, SETTLE_HOLD_MS);
+        }, SETTLE_HOLD_MS + 18);
       });
     },
     [updatePhase]
@@ -158,7 +169,8 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
       const destClean = destUrl.pathname.replace(/\/+$/, "") || "/";
 
       // Case 1: Same-page section anchor (#about, #skill, #works, #gallery, #contact, #home, #top)
-      // Glide smoothly via Lenis instead of fading & teleporting
+      // Use crisp optical fade-out -> instant jump -> fade-in so heavy GPU sections between origin & target
+      // never wake up mid-flight and drop frames, while keeping Lenis smooth scroll active for manual scrolling.
       if (destClean === currentClean) {
         if (!destUrl.hash) return;
 
@@ -169,6 +181,9 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
         if (Math.abs(window.scrollY - targetTop) < 12) {
           return;
         }
+        if (phaseRef.current === "exiting") {
+          return;
+        }
 
         const nextUrl =
           destUrl.hash === "#top" || destUrl.hash === "#home"
@@ -176,11 +191,21 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
             : `${window.location.pathname}${window.location.search}${destUrl.hash}`;
 
         window.history.replaceState(null, "", nextUrl);
-        window.dispatchEvent(
-          new CustomEvent("portfolio:smooth-scroll", {
-            detail: { hash: destUrl.hash, top: targetTop },
-          })
-        );
+        clearTimers();
+        initiatedByClickRef.current = true;
+        updatePhase("exiting");
+
+        const targetHash = destUrl.hash;
+        pushTimerRef.current = window.setTimeout(() => {
+          finishEnter(targetHash);
+        }, EXIT_DURATION_MS);
+
+        safetyTimerRef.current = window.setTimeout(() => {
+          if (phaseRef.current === "exiting") {
+            initiatedByClickRef.current = false;
+            updatePhase("idle");
+          }
+        }, SAFETY_TIMEOUT_MS);
         return;
       }
 
