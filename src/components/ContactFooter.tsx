@@ -4,16 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ArrowUpRight, Check, Copy, X } from "lucide-react";
 import { motion } from "motion/react";
 import { PORTFOLIO_PROFILE } from "@/data/portfolio";
-import { useNearViewport, usePerformanceProfile } from "@/lib/devicePerf";
-import { LazyVgpuCanvas } from "./LazyVgpuCanvas";
+import { useInViewport } from "@/lib/devicePerf";
+import { LazyBlackHoleShowcase } from "./VgpuShowcases";
 
 export function ContactFooter() {
   const [copied, setCopied] = useState(false);
   const [localClock, setLocalClock] = useState("LOCAL");
   const footerRef = useRef<HTMLElement>(null);
   const creditsDialogRef = useRef<HTMLDialogElement>(null);
-  const perf = usePerformanceProfile();
-  const isNearFooter = useNearViewport(footerRef, "350px 0px");
+  const isNearFooter = useInViewport(footerRef, "380px 0px");
 
   useEffect(() => {
     const updateClock = () => {
@@ -85,17 +84,14 @@ export function ContactFooter() {
       id="contact"
       className="relative overflow-hidden bg-[#08090D] px-3 pt-16 pb-10 text-[#F2F4F7] min-[380px]:px-4 sm:px-8 sm:pt-24 lg:px-12 lg:pt-28"
     >
-      {/* Subtle Ambient WebGPU Triangle-LED + Electric Cobalt Flare (vgpu · lazy-mounted, zero-error fallback) */}
-      {isNearFooter && perf && (
+      {/* Official Multi-Pass Baked Optimized Black Hole (vgpu · viewport-mounted + WebGL2 mobile fallback) */}
+      {isNearFooter && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-0 opacity-65"
+          className="pointer-events-none absolute inset-0 z-0 opacity-85"
         >
-          <LazyVgpuCanvas
-            shaderId="cobalt-flare"
-            ambient
-            maxDpr={Math.min(1.5, perf.maxDpr)}
-          />
+          <LazyBlackHoleShowcase ambient />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#08090D]/90 via-[#08090D]/50 to-transparent" />
         </div>
       )}
 

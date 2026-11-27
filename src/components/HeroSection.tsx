@@ -281,7 +281,7 @@ export function HeroSection() {
               transition={{ type: "spring", stiffness: 420, damping: 24 }}
               className="glass-cobalt group inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 whitespace-nowrap font-mono text-[9.5px] font-semibold tracking-[0.08em] text-[#0038FF] uppercase transition-colors hover:bg-[#0038FF] hover:text-white min-[380px]:text-[10px] min-[380px]:tracking-[0.12em] sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[11px] sm:tracking-[0.16em]"
             >
-              <span className="text-trim">3D GALLERY</span>
+              <span className="text-trim">PHOTO GALLERY</span>
               <ArrowUpRight className="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 sm:h-3.5 sm:w-3.5" />
             </motion.a>
           </div>

@@ -127,3 +127,38 @@ export function useNearViewport(
 
   return near;
 }
+
+/**
+ * Live viewport proximity tracker — mounts heavy multi-pass WebGPU showcases
+ * only while near the viewport and cleanly disposes them when scrolled far away
+ * so VRAM and GPU budgets stay low across long pages.
+ */
+export function useInViewport(
+  ref: RefObject<Element | null>,
+  rootMargin = "420px 0px"
+): boolean {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[entries.length - 1];
+        if (entry) {
+          setVisible(entry.isIntersecting);
+        }
+      },
+      { rootMargin }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, rootMargin]);
+
+  return visible;
+}
