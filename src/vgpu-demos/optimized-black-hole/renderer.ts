@@ -1,6 +1,7 @@
 // Browser lifecycle for the baked black-hole pipeline. VGPU stays dynamically imported.
 
 import type { Frame, Gpu, Surface } from "vgpu";
+import { yieldToMain } from "@/lib/devicePerf";
 
 type VgpuApi = typeof import("vgpu");
 
@@ -78,7 +79,7 @@ export function createRenderer({ canvas }: RendererOptions) {
   let cvTarget: Element | undefined;
   let documentVisible =
     typeof document === "undefined" ? true : !document.hidden;
-  let canvasIntersecting = true;
+  let canvasIntersecting = false;
   let cvSkipped = false;
 
   let started = false;
@@ -211,12 +212,18 @@ export function createRenderer({ canvas }: RendererOptions) {
     pendingSize = undefined;
     if (disposed || !size || !gpu || !api || !effects || !targets || !surface)
       return;
+    const nextW = Math.max(1, Math.floor(size.width));
+    const nextH = Math.max(1, Math.floor(size.height));
+    // Guard against no-op / 1px subpixel ResizeObserver fires so we never destroy targets or re-bake unnecessarily
+    if (
+      Math.abs(nextW - targets.gbuffer.size[0]) <= 1 &&
+      Math.abs(nextH - targets.gbuffer.size[1]) <= 1
+    ) {
+      return;
+    }
     try {
       const previousTargets = targets;
-      const nextTargets = createTargets(api, gpu, [
-        Math.max(1, Math.round(size.width)),
-        Math.max(1, Math.round(size.height)),
-      ]);
+      const nextTargets = createTargets(api, gpu, [nextW, nextH]);
       try {
         setBindings(effects, nextTargets);
         setPostUniforms(effects, nextTargets, settings);
@@ -274,7 +281,13 @@ export function createRenderer({ canvas }: RendererOptions) {
     gpu = nextGpu;
     api = vgpu;
     surface = vgpu.surface(gpu, canvas, { dpr: 1 });
+    await yieldToMain();
+    if (disposed) return;
+
     effects = createEffects(vgpu, gpu);
+    await yieldToMain();
+    if (disposed) return;
+
     targets = createTargets(vgpu, gpu, surface.size);
     setBakeUniforms(effects, targets, settings);
     setShadeUniforms(effects, targets, settings, animationTime, currentSceneYaw);
@@ -282,6 +295,16 @@ export function createRenderer({ canvas }: RendererOptions) {
     setPostUniforms(effects, targets, settings);
     await prewarm(effects, targets, surface);
     if (disposed) return;
+
+    // Run the single heavy geodesic G-buffer bake once ahead of arrival (yielded so scroll stays 60fps)
+    await yieldToMain();
+    if (disposed) return;
+    forceBake = false;
+    vgpu.frame(gpu, (frame) => {
+      if (!effects || !targets || !surface) return;
+      renderChain(frame, effects, targets, surface, true);
+    });
+
     observer =
       typeof ResizeObserver === "undefined"
         ? undefined
@@ -303,11 +326,12 @@ export function createRenderer({ canvas }: RendererOptions) {
             entries[entries.length - 1]?.isIntersecting ?? canvasIntersecting;
           reconcileLoop();
         },
-        { threshold: 0 }
+        { rootMargin: "120px 0px", threshold: 0 }
       );
       intersection.observe(canvas);
+    } else {
+      canvasIntersecting = true;
     }
-    measure();
     started = true;
     documentVisible = !document.hidden;
     reconcileLoop();

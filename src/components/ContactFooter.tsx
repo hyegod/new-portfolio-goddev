@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ArrowUpRight, Check, Copy, X } from "lucide-react";
 import { motion } from "motion/react";
 import { PORTFOLIO_PROFILE } from "@/data/portfolio";
-import { useInViewport } from "@/lib/devicePerf";
+import { useNearViewport } from "@/lib/devicePerf";
 import { LazyBlackHoleShowcase } from "./VgpuShowcases";
 
 export function ContactFooter() {
@@ -12,7 +12,9 @@ export function ContactFooter() {
   const [localClock, setLocalClock] = useState("LOCAL");
   const footerRef = useRef<HTMLElement>(null);
   const creditsDialogRef = useRef<HTMLDialogElement>(null);
-  const isNearFooter = useInViewport(footerRef, "120px 0px");
+  // Warm-mount ~950px ahead of arrival so shader compilation & initial geodesic G-buffer bake
+  // finish quietly off-screen (render loop stays 0% GPU paused until visible, zero arrival stutter).
+  const shouldMountBlackHole = useNearViewport(footerRef, "950px 0px");
 
   useEffect(() => {
     const updateClock = () => {
@@ -82,10 +84,10 @@ export function ContactFooter() {
     <footer
       ref={footerRef}
       id="contact"
-      className="deferred-footer relative overflow-hidden bg-[#08090D] px-3 pt-16 pb-10 text-[#F2F4F7] min-[380px]:px-4 sm:px-8 sm:pt-24 lg:px-12 lg:pt-28"
+      className="relative overflow-hidden bg-[#08090D] px-3 pt-16 pb-10 text-[#F2F4F7] min-[380px]:px-4 sm:px-8 sm:pt-24 lg:px-12 lg:pt-28"
     >
-      {/* Official Multi-Pass Baked Optimized Black Hole (vgpu · viewport-mounted + WebGL2 mobile fallback) */}
-      {isNearFooter && (
+      {/* Official Multi-Pass Baked Optimized Black Hole (vgpu · pre-baked ahead of arrival, auto-pauses off-screen) */}
+      {shouldMountBlackHole && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-0 opacity-85"
