@@ -95,14 +95,14 @@ export function ContactFooter() {
         </div>
       )}
 
-      {/* Pure Electric Cobalt Ambient Halo behind Smoked Glass Contact Panel (zero GPU blur filter) */}
+      {/* Pure Electric Cobalt Ambient Halo behind Smoked Glass Contact Panel */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-28 right-4 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(0,56,255,0.26)_0%,transparent_68%)]"
+        className="pointer-events-none absolute -top-24 right-10 h-80 w-80 rounded-full bg-[#0038FF]/30 blur-[120px]"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -bottom-10 left-[18%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.14)_0%,transparent_68%)]"
+        className="pointer-events-none absolute bottom-10 left-1/4 h-64 w-64 rounded-full bg-[#3B82F6]/14 blur-[110px]"
       />
 
       <div className="relative z-10 mx-auto max-w-[1440px]">

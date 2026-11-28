@@ -132,7 +132,8 @@ export function PortfolioExperience({ children }: { children: ReactNode }) {
                 });
 
                 gsap.to(".hero-spray-parallax", {
-                  y: -52,
+                  y: -68,
+                  scale: 1.05,
                   ease: "none",
                   scrollTrigger: {
                     trigger: "#home",

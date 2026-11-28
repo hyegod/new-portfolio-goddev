@@ -57,7 +57,7 @@ export function OptimizedBlackHoleShowcase({
         shaderId="black-hole"
         ambient={ambient}
         forceWebgl
-        maxDpr={0.9}
+        maxDpr={1.5}
         className={className}
         ariaLabel="Relativistic black hole gravitational lensing background"
       />

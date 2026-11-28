@@ -38,6 +38,7 @@ import {
 } from "./choreography";
 import { detectPerformanceProfile } from "@/lib/devicePerf";
 import {
+  DEFAULT_COUNT,
   DEFAULT_LOOK,
   MAX_BURSTS,
   PARTICLE_COUNTS,
@@ -76,7 +77,7 @@ interface LiveBurst extends Burst {
   readonly born: number;
 }
 
-const MAX_DPR = 1.0;
+const MAX_DPR = 1.5;
 const TRAIL_KEEP = 0.8;
 const TRAIL_CUT = 0.25;
 const BURST_AMPLITUDE = 0.2;
@@ -128,9 +129,11 @@ export function createRenderer({
 
   const perfTier = detectPerformanceProfile().tier;
   const adaptiveCount =
-    perfTier === "high"
-      ? PARTICLE_COUNTS["131k"]
-      : PARTICLE_COUNTS["65k"];
+    perfTier === "low"
+      ? PARTICLE_COUNTS["65k"]
+      : perfTier === "medium"
+        ? PARTICLE_COUNTS["131k"]
+        : DEFAULT_COUNT;
 
   const settings: Settings = {
     speed: 1,
@@ -142,7 +145,7 @@ export function createRenderer({
     colorMode: DEFAULT_LOOK.colorMode,
     streaks: DEFAULT_LOOK.streak,
     trails: true,
-    bloom: perfTier === "high" ? DEFAULT_LOOK.bloom : false,
+    bloom: DEFAULT_LOOK.bloom,
     exposure: DEFAULT_LOOK.exposure,
     calm: false,
   };
@@ -324,14 +327,8 @@ export function createRenderer({
     applyCalm();
   };
 
-  const minRenderIntervalMs = perfTier === "high" ? 21 : 32; // ~45fps high, ~30fps medium/low
-  let lastRenderAt = 0;
-
   const tick = () => {
     if (!isVisible || cvSkipped || document.hidden) return;
-    const now = performance.now();
-    if (lastRenderAt && now - lastRenderAt < minRenderIntervalMs) return;
-    lastRenderAt = now;
     try {
       render();
     } catch {

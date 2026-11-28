@@ -13,7 +13,6 @@ import {
 import type { PointCloudData } from "@/lib/pointCloudGenerator";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
 import { ConcreteCracks, HeroSprayArtwork } from "./SprayArtworks";
-import { LazyInteractiveFluidShowcase } from "./VgpuShowcases";
 
 const GHOST_LINES = [
   "STATIC PLANS",
@@ -26,7 +25,6 @@ const GHOST_LINES = [
 export function HeroSection() {
   const perf = usePerformanceProfile();
   const [heroCloud, setHeroCloud] = useState<PointCloudData | null>(null);
-  const [fluidBooted, setFluidBooted] = useState(false);
   const [pulseCount, setPulseCount] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
@@ -62,20 +60,7 @@ export function HeroSection() {
     };
   }, []);
 
-  // Stagger GPU shader boot cleanly during preloader so Fluid, Bridge & Bots never compile at once
-  useEffect(() => {
-    let cancelFluid: (() => void) | undefined;
-    const timer = window.setTimeout(() => {
-      cancelFluid = scheduleBackgroundTask(() => {
-        setFluidBooted(true);
-      }, 220);
-    }, 420);
-    return () => {
-      window.clearTimeout(timer);
-      cancelFluid?.();
-    };
-  }, []);
-
+  // Defer 3D bridge point cloud cleanly behind initial Hero paint
   useEffect(() => {
     if (!perf) return;
     let cancelled = false;
@@ -89,8 +74,8 @@ export function HeroSection() {
             }
           })
           .catch(() => {});
-      }, 280);
-    }, 950);
+      }, 260);
+    }, 520);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -147,21 +132,13 @@ export function HeroSection() {
       onClick={handleHeroClick}
       className="relative flex min-h-[100svh] flex-col justify-between overflow-hidden border-b border-black/12 px-3 pt-[74px] pb-4 min-[380px]:px-4 min-[380px]:pt-[84px] sm:px-8 sm:pb-5 lg:px-12"
     >
-      {/* Layer 0: Ambient Interactive Navier-Stokes Concrete × Cobalt Fluid (deferred past LCP, unmounts off-screen) */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 opacity-75"
-      >
-        {fluidBooted && isHeroInView && <LazyInteractiveFluidShowcase ambient />}
-      </div>
-
       {/* Architectural Concrete Crack Accents */}
       <ConcreteCracks className="pointer-events-none absolute top-12 left-0 z-[1] h-[260px] w-[220px] opacity-80 sm:h-[360px] sm:w-[300px]" />
 
-      {/* Layer 1: 3D Cable-Stayed Bridge Point-Cloud (unmounts off-screen, no mix-blend readback) */}
+      {/* 3D Cable-Stayed Bridge Point-Cloud over Concrete Surface (unmounts off-screen) */}
       <div
-        className={`pointer-events-none absolute inset-0 z-[1] transition-opacity duration-700 ${
-          heroCloud ? "opacity-60" : "opacity-0"
+        className={`pointer-events-none absolute inset-0 z-[1] mix-blend-multiply transition-opacity duration-700 ${
+          heroCloud ? "opacity-55" : "opacity-0"
         }`}
       >
         {heroCloud && perf && isHeroInView && (
@@ -184,8 +161,8 @@ export function HeroSection() {
             showHud
             showGimbal={false}
             cameraDistance={4.15}
-            pointSizeScale={0.95 * perf.pointSizeBoost}
-            maxDpr={Math.min(perf.maxDpr, 1.0)}
+            pointSizeScale={0.92 * perf.pointSizeBoost}
+            maxDpr={perf.maxDpr}
             ariaLabel="Ambient interactive 3D cable-stayed bridge point cloud behind hero typography"
           />
         )}

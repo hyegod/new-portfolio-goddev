@@ -71,7 +71,7 @@ export function SpringChoreographyShowcase({
         shaderId="fluid"
         ambient
         forceWebgl
-        maxDpr={0.9}
+        maxDpr={1.4}
         className={className}
         ariaLabel="Interactive fluid particle field behind slogan"
       />

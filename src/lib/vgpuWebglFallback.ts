@@ -924,12 +924,10 @@ export function startWebglShaderFallback(
     typeof window !== "undefined" &&
     window.matchMedia("(pointer: coarse)").matches;
   const effectiveMaxDpr = !isHardwareGpu
-    ? 0.5
-    : ambient
-      ? Math.min(maxDpr, 0.85)
-      : isCoarsePointer
-        ? Math.min(maxDpr, 1.15)
-        : Math.min(maxDpr, 1.35);
+    ? 0.85
+    : isCoarsePointer
+      ? Math.min(maxDpr, 1.35)
+      : Math.min(maxDpr, 1.75);
 
   // Fullscreen triangle covering clip space (-1..1)
   const quadBuf = gl.createBuffer();
@@ -959,11 +957,9 @@ export function startWebglShaderFallback(
   // Fluid ping-pong state (RGBA8 works on 100% of phones/tablets without float FBO extensions)
   const simSize = !isHardwareGpu
     ? 96
-    : ambient
-      ? 160
-      : isCoarsePointer
-        ? 256
-        : 320;
+    : isCoarsePointer
+      ? 320
+      : 448;
   const ppTex: WebGLTexture[] = [];
   const ppFbo: WebGLFramebuffer[] = [];
   let readIdx = 0;

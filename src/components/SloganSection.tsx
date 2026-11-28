@@ -63,7 +63,7 @@ export function SloganSection() {
                     SLOGAN // CONCRETE × CODE
                   </p>
                   <span className="font-mono text-[9px] tracking-[0.16em] text-white/50 uppercase sm:tracking-[0.18em]">
-                    SPRING · VGPU
+                    SPRING · 262K GPU
                   </span>
                 </div>
                 <p className="text-lg font-bold tracking-tight text-white sm:text-xl">

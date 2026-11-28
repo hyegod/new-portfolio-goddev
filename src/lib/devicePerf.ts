@@ -17,27 +17,27 @@ export interface PerformanceProfile {
 const PROFILES: Record<DevicePerfTier, Omit<PerformanceProfile, "isTouchOnly">> = {
   high: {
     tier: "high",
-    heroPoints: 9500,
-    worksPoints: 22000,
-    galleryPoints: 36000,
-    maxDpr: 1.35,
-    pointSizeBoost: 1.06,
+    heroPoints: 16000,
+    worksPoints: 30000,
+    galleryPoints: 52000,
+    maxDpr: 1.75,
+    pointSizeBoost: 1,
   },
   medium: {
     tier: "medium",
-    heroPoints: 6000,
-    worksPoints: 14000,
-    galleryPoints: 24000,
-    maxDpr: 1.15,
-    pointSizeBoost: 1.16,
+    heroPoints: 10000,
+    worksPoints: 18000,
+    galleryPoints: 32000,
+    maxDpr: 1.4,
+    pointSizeBoost: 1.12,
   },
   low: {
     tier: "low",
-    heroPoints: 3600,
-    worksPoints: 9000,
-    galleryPoints: 15000,
-    maxDpr: 1.0,
-    pointSizeBoost: 1.28,
+    heroPoints: 6000,
+    worksPoints: 12000,
+    galleryPoints: 20000,
+    maxDpr: 1.2,
+    pointSizeBoost: 1.24,
   },
 };
 
@@ -253,7 +253,6 @@ export function hasHardwareWebGL(): boolean {
     probe.width = 2;
     probe.height = 2;
     const attrs: WebGLContextAttributes = {
-      failIfMajorPerformanceCaveat: true,
       alpha: false,
       antialias: false,
       depth: false,
