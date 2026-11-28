@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { PORTFOLIO_PROFILE } from "@/data/portfolio";
 import {
@@ -61,29 +62,39 @@ export function HeroSection() {
     };
   }, []);
 
-  // Defer ambient GPU fluid & 3D bridge behind initial Hero LCP paint using background priority scheduling
+  // Stagger GPU shader boot cleanly during preloader so Fluid, Bridge & Bots never compile at once
   useEffect(() => {
-    const cancelFluid = scheduleBackgroundTask(() => {
-      setFluidBooted(true);
-    }, 180);
-    return cancelFluid;
+    let cancelFluid: (() => void) | undefined;
+    const timer = window.setTimeout(() => {
+      cancelFluid = scheduleBackgroundTask(() => {
+        setFluidBooted(true);
+      }, 220);
+    }, 420);
+    return () => {
+      window.clearTimeout(timer);
+      cancelFluid?.();
+    };
   }, []);
 
   useEffect(() => {
     if (!perf) return;
     let cancelled = false;
-    const cancelTask = scheduleBackgroundTask(() => {
-      import("@/lib/pointCloudGenerator")
-        .then(({ generatePresetPointCloud }) => {
-          if (!cancelled) {
-            setHeroCloud(generatePresetPointCloud("bridge", perf.heroPoints));
-          }
-        })
-        .catch(() => {});
-    }, 260);
+    let cancelTask: (() => void) | undefined;
+    const timer = window.setTimeout(() => {
+      cancelTask = scheduleBackgroundTask(() => {
+        import("@/lib/pointCloudGenerator")
+          .then(({ generatePresetPointCloud }) => {
+            if (!cancelled) {
+              setHeroCloud(generatePresetPointCloud("bridge", perf.heroPoints));
+            }
+          })
+          .catch(() => {});
+      }, 280);
+    }, 950);
     return () => {
       cancelled = true;
-      cancelTask();
+      window.clearTimeout(timer);
+      cancelTask?.();
     };
   }, [perf]);
 
@@ -147,13 +158,13 @@ export function HeroSection() {
       {/* Architectural Concrete Crack Accents */}
       <ConcreteCracks className="pointer-events-none absolute top-12 left-0 z-[1] h-[260px] w-[220px] opacity-80 sm:h-[360px] sm:w-[300px]" />
 
-      {/* Layer 1: 3D Cable-Stayed Bridge Point-Cloud blended seamlessly over Interactive Fluid */}
+      {/* Layer 1: 3D Cable-Stayed Bridge Point-Cloud (unmounts off-screen, no mix-blend readback) */}
       <div
-        className={`pointer-events-none absolute inset-0 z-[1] mix-blend-multiply transition-opacity duration-700 ${
-          heroCloud ? "opacity-55" : "opacity-0"
+        className={`pointer-events-none absolute inset-0 z-[1] transition-opacity duration-700 ${
+          heroCloud ? "opacity-60" : "opacity-0"
         }`}
       >
-        {heroCloud && perf && (
+        {heroCloud && perf && isHeroInView && (
           <LazyGatherPointCloud
             cloud={heroCloud}
             pointCount={perf.heroPoints}
@@ -173,8 +184,8 @@ export function HeroSection() {
             showHud
             showGimbal={false}
             cameraDistance={4.15}
-            pointSizeScale={0.92 * perf.pointSizeBoost}
-            maxDpr={perf.maxDpr}
+            pointSizeScale={0.95 * perf.pointSizeBoost}
+            maxDpr={Math.min(perf.maxDpr, 1.0)}
             ariaLabel="Ambient interactive 3D cable-stayed bridge point cloud behind hero typography"
           />
         )}
@@ -272,27 +283,21 @@ export function HeroSection() {
           </div>
 
           <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-2.5">
-            <motion.a
-              href="#works"
-              whileHover={{ scale: 1.03, y: -2 }}
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 420, damping: 24 }}
-              className="group inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0D0E12] px-2.5 py-2 whitespace-nowrap font-mono text-[9.5px] font-semibold tracking-[0.08em] text-white uppercase transition-colors hover:bg-[#0038FF] min-[380px]:text-[10px] min-[380px]:tracking-[0.12em] sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[11px] sm:tracking-[0.16em]"
+            <Link
+              href="/works"
+              className="group inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0D0E12] px-2.5 py-2 whitespace-nowrap font-mono text-[9.5px] font-semibold tracking-[0.08em] text-white uppercase transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-[#0038FF] active:scale-[0.98] min-[380px]:text-[10px] min-[380px]:tracking-[0.12em] sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[11px] sm:tracking-[0.16em]"
             >
               <span className="text-trim">SELECTED WORKS</span>
-              <ArrowDownRight className="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5 sm:h-3.5 sm:w-3.5" />
-            </motion.a>
+              <ArrowUpRight className="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 sm:h-3.5 sm:w-3.5" />
+            </Link>
 
-            <motion.a
-              href="#gallery"
-              whileHover={{ scale: 1.03, y: -2 }}
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 420, damping: 24 }}
-              className="glass-cobalt group inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 whitespace-nowrap font-mono text-[9.5px] font-semibold tracking-[0.08em] text-[#0038FF] uppercase transition-colors hover:bg-[#0038FF] hover:text-white min-[380px]:text-[10px] min-[380px]:tracking-[0.12em] sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[11px] sm:tracking-[0.16em]"
+            <Link
+              href="/gallery"
+              className="glass-cobalt group inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 whitespace-nowrap font-mono text-[9.5px] font-semibold tracking-[0.08em] text-[#0038FF] uppercase transition-[transform,background-color,color] duration-200 hover:-translate-y-0.5 hover:bg-[#0038FF] hover:text-white active:scale-[0.98] min-[380px]:text-[10px] min-[380px]:tracking-[0.12em] sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[11px] sm:tracking-[0.16em]"
             >
               <span className="text-trim">PHOTO GALLERY</span>
               <ArrowUpRight className="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 sm:h-3.5 sm:w-3.5" />
-            </motion.a>
+            </Link>
           </div>
         </div>
       </div>

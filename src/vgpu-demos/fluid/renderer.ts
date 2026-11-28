@@ -50,14 +50,26 @@ export function createRenderer(options: RendererOptions) {
     }
   };
 
+  const ambientFrameIntervalMs = options.ambient ? 1000 / 30 - 2 : 0;
+
   const tick = (now: number) => {
     animationFrame = 0;
     if (disposed || !isVisible || cvSkipped || document.hidden) return;
+    const elapsedMs = now - previous;
+    if (ambientFrameIntervalMs > 0 && elapsedMs < ambientFrameIntervalMs) {
+      animationFrame = requestAnimationFrame(tick);
+      return;
+    }
     if (fluid && input && canvasSurface) {
-      const fixed = fixedStepCount(accumulator, (now - previous) / 1000);
-      accumulator = fixed.accumulator;
-      for (let i = 0; i < fixed.steps; i++) {
+      if (options.ambient) {
+        // Single deterministic fluid step at ~30fps cuts Hero WebGPU compute/render load in half
         stepFluid(fluid, input);
+      } else {
+        const fixed = fixedStepCount(accumulator, elapsedMs / 1000);
+        accumulator = fixed.accumulator;
+        for (let i = 0; i < fixed.steps; i++) {
+          stepFluid(fluid, input);
+        }
       }
       renderFluid(fluid, canvasSurface);
     }
@@ -111,9 +123,9 @@ export function createRenderer(options: RendererOptions) {
       return;
     }
     gpu = nextGpu;
-    // Ambient dye grid is 512×288; capping DPR at 1.25 preserves crispness while cutting fragment bandwidth ~45%
+    // Soft painterly ambient fluid renders identically at 0.85x DPR while cutting fragment bandwidth ~55%
     canvasSurface = surface(gpu, options.canvas, {
-      dpr: options.ambient ? [1, 1.25] : [1, 1.5],
+      dpr: options.ambient ? [0.75, 0.9] : [1, 1.25],
     });
     fluid = createFluid(gpu);
     input = installStirInput(options.canvas, options.ambient);

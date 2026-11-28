@@ -23,7 +23,7 @@ const SCENE_YAW_TAU_S = 0.325;
 
 const MAX_FRAME_DT_S = 0.1;
 
-const TARGET_FPS = 60;
+const TARGET_FPS = 36;
 
 const FRAME_PACING_EPSILON_MS = 2;
 
@@ -273,7 +273,7 @@ export function createRenderer({ canvas }: RendererOptions) {
     }
     gpu = nextGpu;
     api = vgpu;
-    surface = vgpu.surface(gpu, canvas, { dpr: 1 });
+    surface = vgpu.surface(gpu, canvas, { dpr: 0.85 });
     effects = createEffects(vgpu, gpu);
     targets = createTargets(vgpu, gpu, surface.size);
     setBakeUniforms(effects, targets, settings);

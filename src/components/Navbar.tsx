@@ -10,8 +10,8 @@ import { PORTFOLIO_PROFILE } from "@/data/portfolio";
 const NAV_LINKS = [
   { id: "about", label: "ABOUT", homeHref: "#about", subHref: "/#about" },
   { id: "skill", label: "SKILL", homeHref: "#skill", subHref: "/#skill" },
-  { id: "works", label: "WORKS", homeHref: "#works", subHref: "/works" },
-  { id: "gallery", label: "GALLERY", homeHref: "#gallery", subHref: "/gallery" },
+  { id: "works", label: "WORKS", homeHref: "/works", subHref: "/works" },
+  { id: "gallery", label: "GALLERY", homeHref: "/gallery", subHref: "/gallery" },
 ];
 
 export function Navbar() {
@@ -49,7 +49,7 @@ export function Navbar() {
       return;
     }
 
-    const sectionIds = ["home", "about", "skill", "works", "gallery", "contact"];
+    const sectionIds = ["home", "about", "skill", "github", "contact"];
     let rafId = 0;
 
     const computeActive = () => {

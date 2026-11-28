@@ -133,7 +133,7 @@ function GitHubIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
-export function GitHubWorksPanel() {
+export function GitHubWorksPanel({ embedded = false }: { embedded?: boolean }) {
   const [data, setData] = useState<GitHubTelemetryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [surface, setSurface] = useState<HeatmapSurface>("light");
@@ -209,7 +209,11 @@ export function GitHubWorksPanel() {
     <div
       ref={panelRef}
       id="github-works"
-      className="mt-16 border-t border-black/12 pt-12 sm:mt-20 sm:pt-16"
+      className={
+        embedded
+          ? "pt-2"
+          : "mt-16 border-t border-black/12 pt-12 sm:mt-20 sm:pt-16"
+      }
     >
       {/* Section Sub-Header — Clean & Uncluttered */}
       <div className="reveal-up mb-6 sm:mb-8">

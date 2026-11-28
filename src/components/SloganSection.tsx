@@ -8,7 +8,7 @@ import { LazySpringChoreographyShowcase } from "./VgpuShowcases";
 
 export function SloganSection() {
   const sectionRef = useRef<HTMLElement>(null);
-  const showSpring = useInViewport(sectionRef, "220px 0px");
+  const showSpring = useInViewport(sectionRef, "120px 0px");
 
   return (
     <section
@@ -63,7 +63,7 @@ export function SloganSection() {
                     SLOGAN // CONCRETE × CODE
                   </p>
                   <span className="font-mono text-[9px] tracking-[0.16em] text-white/50 uppercase sm:tracking-[0.18em]">
-                    SPRING · 262K GPU
+                    SPRING · VGPU
                   </span>
                 </div>
                 <p className="text-lg font-bold tracking-tight text-white sm:text-xl">

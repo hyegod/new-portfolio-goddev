@@ -10,10 +10,7 @@ import {
   type GalleryPlate,
   type ProjectItem,
 } from "@/data/portfolio";
-import {
-  LazyGitHubWorksPanel,
-  LazyWorksLabSection,
-} from "./LazyHeavyModules";
+import { LazyWorksLabSection } from "./LazyHeavyModules";
 import { OptimizedImage } from "./OptimizedImage";
 
 type DisciplineFilter = "ALL" | ProjectItem["discipline"];
@@ -55,7 +52,7 @@ export function WorksArchiveClient({
           </Link>
 
           <span className="font-mono text-[10px] tracking-[0.18em] text-[#505562] uppercase">
-            {String(list.length).padStart(2, "0")} CASE STUDIES · LIVE GITHUB ARCHIVE
+            {String(list.length).padStart(2, "0")} CASE STUDIES · 3D LIDAR &amp; WEBGPU LAB
           </span>
         </div>
 
@@ -203,9 +200,6 @@ export function WorksArchiveClient({
             </motion.article>
           ))}
         </div>
-
-        {/* Live GitHub Contributions & Auto-Synced Public Repos (lazy-loaded near viewport) */}
-        <LazyGitHubWorksPanel />
 
         {/* Interactive 3D LiDAR Studio, WebGPU Lab (vgpu), & Technical Blueprint Plates (lazy-loaded) */}
         <LazyWorksLabSection showPlates plates={plates} />

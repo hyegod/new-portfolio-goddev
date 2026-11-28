@@ -60,9 +60,16 @@ export function RoamingBotsOverlay() {
     }
 
     setSupported(true);
-    return scheduleBackgroundTask(() => {
-      setBooted(true);
-    }, 360);
+    let cancelBoot: (() => void) | undefined;
+    const timer = window.setTimeout(() => {
+      cancelBoot = scheduleBackgroundTask(() => {
+        setBooted(true);
+      }, 300);
+    }, 1450);
+    return () => {
+      window.clearTimeout(timer);
+      cancelBoot?.();
+    };
   }, []);
 
   useEffect(() => {

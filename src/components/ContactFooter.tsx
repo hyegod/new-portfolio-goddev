@@ -12,7 +12,7 @@ export function ContactFooter() {
   const [localClock, setLocalClock] = useState("LOCAL");
   const footerRef = useRef<HTMLElement>(null);
   const creditsDialogRef = useRef<HTMLDialogElement>(null);
-  const isNearFooter = useInViewport(footerRef, "220px 0px");
+  const isNearFooter = useInViewport(footerRef, "120px 0px");
 
   useEffect(() => {
     const updateClock = () => {
@@ -95,14 +95,14 @@ export function ContactFooter() {
         </div>
       )}
 
-      {/* Pure Electric Cobalt Ambient Halo behind Smoked Glass Contact Panel */}
+      {/* Pure Electric Cobalt Ambient Halo behind Smoked Glass Contact Panel (zero GPU blur filter) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-24 right-10 h-80 w-80 rounded-full bg-[#0038FF]/30 blur-[120px]"
+        className="pointer-events-none absolute -top-28 right-4 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(0,56,255,0.26)_0%,transparent_68%)]"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-10 left-1/4 h-64 w-64 rounded-full bg-[#3B82F6]/14 blur-[110px]"
+        className="pointer-events-none absolute -bottom-10 left-[18%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.14)_0%,transparent_68%)]"
       />
 
       <div className="relative z-10 mx-auto max-w-[1440px]">
@@ -114,7 +114,7 @@ export function ContactFooter() {
                 className="status-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#3B82F6]"
                 aria-hidden="true"
               />
-              <span>06 // CONTACT · START A CONVERSATION</span>
+              <span>05 // CONTACT · START A CONVERSATION</span>
             </p>
 
             <h2 className="mt-3.5 font-display text-[clamp(1.5rem,4.4vw,4rem)] leading-[0.95] font-extrabold tracking-[-0.03em] text-white uppercase">

@@ -1472,6 +1472,8 @@ export function createRoamingRenderer({
     }
   };
 
+  const IDLE_FRAME_INTERVAL_MS = 24; // ~40fps while roaming idle; full 60fps when scrolling or dragging
+
   const tick = (now: number) => {
     rafId = 0;
     if (
@@ -1485,6 +1487,19 @@ export function createRoamingRenderer({
     ) {
       return;
     }
+    const currentScrollY = window.scrollY;
+    const isScrollingNow = Math.abs(currentScrollY - lastFrameScrollY) > 0.5;
+    const isCarrying = airborne.some(Boolean);
+    if (
+      lastFrameAt &&
+      !isScrollingNow &&
+      !isCarrying &&
+      now - lastFrameAt < IDLE_FRAME_INTERVAL_MS
+    ) {
+      rafId = requestAnimationFrame(tick);
+      return;
+    }
+
     const rawDt = lastFrameAt
       ? Math.min(0.08, (now - lastFrameAt) / 1000)
       : FIXED_DT;
@@ -1492,7 +1507,6 @@ export function createRoamingRenderer({
     renderTime += rawDt;
 
     // Anchor grounded & falling robots directly to webpage scroll (carried robot stays under cursor)
-    const currentScrollY = window.scrollY;
     const deltaScrollY = currentScrollY - lastFrameScrollY;
     lastFrameScrollY = currentScrollY;
     scrollSpeedPx =
@@ -1612,11 +1626,12 @@ export function createRoamingRenderer({
     }
 
     gpu = nextGpu;
+    // Disable full-viewport 4x MSAA & lock DPR to 1.0 (~7x lower GPU fill-rate across entire site)
     output = surface(gpu, canvas, {
       alphaMode: "premultiplied",
       depth: true,
-      msaa: true,
-      dpr: [1, 1.35],
+      msaa: false,
+      dpr: 1,
       clearColor: [0, 0, 0, 0],
       label: "roaming-bots-surface",
     });

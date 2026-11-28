@@ -68,13 +68,21 @@ function WorksLabSkeleton() {
  * Defers downloading and hydrating the GitHub contribution graph & repo cards
  * until the visitor scrolls within 850px.
  */
-export function LazyGitHubWorksPanel() {
+export function LazyGitHubWorksPanel({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const isNear = useNearViewport(wrapperRef, "850px 0px");
 
   return (
     <div ref={wrapperRef}>
-      {isNear ? <DynamicGitHubWorksPanel /> : <GitHubPanelSkeleton />}
+      {isNear ? (
+        <DynamicGitHubWorksPanel embedded={embedded} />
+      ) : (
+        <GitHubPanelSkeleton />
+      )}
     </div>
   );
 }
