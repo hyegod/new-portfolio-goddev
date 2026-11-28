@@ -10,8 +10,11 @@ import {
   type GalleryPlate,
   type ProjectItem,
 } from "@/data/portfolio";
-import { GitHubWorksPanel } from "./GitHubWorksPanel";
-import { WorksLabSection } from "./WorksLabSection";
+import {
+  LazyGitHubWorksPanel,
+  LazyWorksLabSection,
+} from "./LazyHeavyModules";
+import { OptimizedImage } from "./OptimizedImage";
 
 type DisciplineFilter = "ALL" | ProjectItem["discipline"];
 
@@ -103,11 +106,11 @@ export function WorksArchiveClient({
           {filteredProjects.map((project, idx) => (
             <motion.article
               key={project.id}
-              initial={{ opacity: 0, y: 20, filter: "blur(5px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: 0.75,
-                delay: Math.min(idx * 0.1, 0.4),
+                duration: 0.6,
+                delay: Math.min(idx * 0.08, 0.32),
                 ease: [0.22, 1, 0.36, 1],
               }}
               className="group flex min-w-0 flex-col justify-between rounded-2xl border border-black/12 bg-white/85 p-5 shadow-[0_12px_32px_-16px_rgba(13,14,18,0.1)] transition-all hover:border-[#0038FF]/40 hover:bg-white hover:shadow-[0_22px_44px_-16px_rgba(0,56,255,0.16)] sm:p-7"
@@ -147,13 +150,12 @@ export function WorksArchiveClient({
                 </div>
 
                 {project.imageUrl && (
-                  <div className="mt-4 aspect-[16/9] w-full overflow-hidden rounded-xl border border-black/10 bg-[#ECEEF0]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                  <div className="relative mt-4 aspect-[16/9] w-full overflow-hidden rounded-xl border border-black/10 bg-[#ECEEF0]">
+                    <OptimizedImage
                       src={project.imageUrl}
                       alt={project.title}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     />
                   </div>
                 )}
@@ -202,11 +204,11 @@ export function WorksArchiveClient({
           ))}
         </div>
 
-        {/* Live GitHub Contributions & Auto-Synced Public Repos */}
-        <GitHubWorksPanel />
+        {/* Live GitHub Contributions & Auto-Synced Public Repos (lazy-loaded near viewport) */}
+        <LazyGitHubWorksPanel />
 
-        {/* Interactive 3D LiDAR Studio, WebGPU Lab (vgpu), & Technical Blueprint Plates */}
-        <WorksLabSection showPlates plates={plates} />
+        {/* Interactive 3D LiDAR Studio, WebGPU Lab (vgpu), & Technical Blueprint Plates (lazy-loaded) */}
+        <LazyWorksLabSection showPlates plates={plates} />
       </div>
     </section>
   );

@@ -7,9 +7,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { EngineeringCursor } from "./EngineeringCursor";
+import { scheduleBackgroundTask } from "@/lib/devicePerf";
 import { InitialPreloader } from "./InitialPreloader";
+
+const LazyEngineeringCursor = dynamic(
+  () => import("./EngineeringCursor").then((mod) => mod.EngineeringCursor),
+  { ssr: false }
+);
 
 type TransitionPhase = "idle" | "exiting" | "entering";
 
@@ -38,6 +44,21 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   const [phase, setPhase] = useState<TransitionPhase>("idle");
+  const [mountCursor, setMountCursor] = useState(false);
+
+  // Only download & mount custom CAD cursor on fine-pointer desktop devices
+  useEffect(() => {
+    const isFinePointer = window.matchMedia(
+      "(hover: hover) and (pointer: fine)"
+    ).matches;
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    if (!isFinePointer || prefersReduced) return;
+    return scheduleBackgroundTask(() => {
+      setMountCursor(true);
+    }, 320);
+  }, []);
 
   const phaseRef = useRef<TransitionPhase>("idle");
   const prevPathnameRef = useRef<string>(pathname);
@@ -251,8 +272,8 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
       {/* Minimalist Architectural Initial Loading Curtain */}
       <InitialPreloader />
 
-      {/* Persistent Precision CAD Custom Cursor */}
-      <EngineeringCursor />
+      {/* Persistent Precision CAD Custom Cursor (desktop fine-pointer only) */}
+      {mountCursor && <LazyEngineeringCursor />}
 
       {/* Whisper-thin 2px Electric Cobalt Top Route Hairline */}
       <div

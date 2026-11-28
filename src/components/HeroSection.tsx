@@ -9,10 +9,7 @@ import {
   useInViewport,
   usePerformanceProfile,
 } from "@/lib/devicePerf";
-import {
-  generatePresetPointCloud,
-  type PointCloudData,
-} from "@/lib/pointCloudGenerator";
+import type { PointCloudData } from "@/lib/pointCloudGenerator";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
 import { ConcreteCracks, HeroSprayArtwork } from "./SprayArtworks";
 import { LazyInteractiveFluidShowcase } from "./VgpuShowcases";
@@ -74,9 +71,20 @@ export function HeroSection() {
 
   useEffect(() => {
     if (!perf) return;
-    return scheduleBackgroundTask(() => {
-      setHeroCloud(generatePresetPointCloud("bridge", perf.heroPoints));
+    let cancelled = false;
+    const cancelTask = scheduleBackgroundTask(() => {
+      import("@/lib/pointCloudGenerator")
+        .then(({ generatePresetPointCloud }) => {
+          if (!cancelled) {
+            setHeroCloud(generatePresetPointCloud("bridge", perf.heroPoints));
+          }
+        })
+        .catch(() => {});
     }, 260);
+    return () => {
+      cancelled = true;
+      cancelTask();
+    };
   }, [perf]);
 
   const handleHeroPointerMove = (e: PointerEvent<HTMLElement>) => {

@@ -19,6 +19,7 @@ import {
   type PhotoGalleryItem,
   type PhotoTone,
 } from "@/data/portfolio";
+import { OptimizedImage } from "./OptimizedImage";
 
 type PhotoFilter = "ALL" | PhotoCategory;
 
@@ -71,6 +72,16 @@ function getBentoTileClass(size: PhotoBentoSize): string {
       return "min-h-[320px] sm:min-h-0 sm:col-span-1 sm:row-span-2";
     default:
       return "min-h-[245px] sm:min-h-0 sm:col-span-1 sm:row-span-1";
+  }
+}
+
+function getBentoImageSizes(size: PhotoBentoSize): string {
+  switch (size) {
+    case "hero":
+    case "wide":
+      return "(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 50vw";
+    default:
+      return "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw";
   }
 }
 
@@ -443,14 +454,14 @@ export function GallerySection({
                   {/* Full-Bleed Photograph or Atmospheric Frame Study */}
                   <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-[1.045]">
                     {photo.imageUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
+                      <OptimizedImage
                         src={photo.imageUrl}
                         alt={photo.title}
+                        sizes={getBentoImageSizes(photo.bentoSize)}
                         loading={standalone && idx === 0 ? "eager" : "lazy"}
                         fetchPriority={standalone && idx === 0 ? "high" : undefined}
                         decoding={standalone && idx === 0 ? "sync" : "async"}
-                        className="h-full w-full object-cover"
+                        className="object-cover"
                       />
                     ) : (
                       <EditorialPhotoArtwork
@@ -547,14 +558,16 @@ export function GallerySection({
           <div className="editorial-dialog-scroll p-3.5 sm:p-6" data-lenis-prevent>
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.45fr)_330px] lg:items-stretch">
               {/* Left: Matte Gallery Photo Stage (uncropped full-frame display) */}
-              <div className="relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-xl border border-black/15 bg-[#0B0D13] sm:min-h-[380px] lg:min-h-[480px]">
+              <div className="relative flex h-[52vh] min-h-[260px] items-center justify-center overflow-hidden rounded-xl border border-black/15 bg-[#0B0D13] sm:h-[58vh] sm:min-h-[380px] lg:h-[68vh] lg:min-h-[480px]">
                 {activePhoto.imageUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
+                  <OptimizedImage
                     src={activePhoto.imageUrl}
                     alt={activePhoto.title}
+                    sizes="(max-width: 1024px) 94vw, 66vw"
+                    quality={85}
+                    loading="eager"
                     decoding="async"
-                    className="max-h-[58vh] w-full object-contain lg:max-h-[70vh]"
+                    className="object-contain"
                   />
                 ) : (
                   <div className="aspect-[4/3] w-full max-w-full">

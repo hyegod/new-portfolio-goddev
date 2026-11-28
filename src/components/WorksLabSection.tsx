@@ -37,6 +37,7 @@ import type {
 } from "./GatherPointCloud";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
 import { LazyVgpuCanvas } from "./LazyVgpuCanvas";
+import { OptimizedImage } from "./OptimizedImage";
 import { TouchInteractPill, useTouchInteractGate } from "./TouchInteractGate";
 import type { VgpuShaderId, VgpuStatus } from "./VgpuCanvas";
 
@@ -304,9 +305,11 @@ function BlueprintGraphic({
 export function WorksLabSection({
   showPlates = true,
   plates = GALLERY_PLATES,
+  omitSectionId = false,
 }: {
   showPlates?: boolean;
   plates?: GalleryPlate[];
+  omitSectionId?: boolean;
 }) {
   const plateList = plates.length > 0 ? plates : GALLERY_PLATES;
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -634,9 +637,9 @@ export function WorksLabSection({
 
   return (
     <div
-      id="lab"
+      id={omitSectionId ? undefined : "lab"}
       ref={sectionRef}
-      tabIndex={-1}
+      tabIndex={omitSectionId ? undefined : -1}
       className="relative mt-14 scroll-mt-24 border-t border-black/12 pt-12 outline-none focus:outline-none sm:mt-16 sm:pt-14"
       aria-labelledby="works-lab-heading"
     >
@@ -934,6 +937,8 @@ export function WorksLabSection({
                     <img
                       src={item.thumbnail}
                       alt={item.label}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                   </span>
@@ -1380,11 +1385,11 @@ export function WorksLabSection({
           {visiblePlates.map((plate, idx) => (
             <motion.div
               key={plate.id}
-              initial={{ opacity: 0, y: 18, filter: "blur(5px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: 0.65,
-                delay: Math.min(idx * 0.07, 0.3),
+                duration: 0.55,
+                delay: Math.min(idx * 0.06, 0.28),
                 ease: [0.22, 1, 0.36, 1],
               }}
               className="flex min-w-0"
@@ -1402,14 +1407,13 @@ export function WorksLabSection({
                 <span className="whitespace-nowrap">{plate.scale}</span>
               </div>
 
-              <div className="aspect-[16/10] w-full overflow-hidden border-b border-black/10 bg-[#F6F7F9] text-[#0D0E12] transition-transform duration-300 group-hover:scale-[1.015]">
+              <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-black/10 bg-[#F6F7F9] text-[#0D0E12] transition-transform duration-300 group-hover:scale-[1.015]">
                 {plate.imageUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
+                  <OptimizedImage
                     src={plate.imageUrl}
                     alt={plate.title}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-cover"
                   />
                 ) : (
                   <BlueprintGraphic type={plate.visualType} />
@@ -1496,13 +1500,15 @@ export function WorksLabSection({
               </form>
             </div>
 
-            <div className="mt-4 aspect-[16/10] w-full overflow-hidden rounded-xl border border-black/15 bg-white text-[#0D0E12] sm:mt-5">
+            <div className="relative mt-4 aspect-[16/10] w-full overflow-hidden rounded-xl border border-black/15 bg-white text-[#0D0E12] sm:mt-5">
               {activePlate.imageUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
+                <OptimizedImage
                   src={activePlate.imageUrl}
                   alt={activePlate.title}
-                  className="h-full w-full object-cover"
+                  sizes="(max-width: 1024px) 92vw, 900px"
+                  quality={85}
+                  loading="eager"
+                  className="object-cover"
                 />
               ) : (
                 <BlueprintGraphic type={activePlate.visualType} />

@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "motion/react";
 import { SKILL_PILLARS, type SkillTier } from "@/data/portfolio";
 
 const STANDARDS = [
@@ -79,11 +76,7 @@ export function SkillSection() {
         >
           {SKILL_PILLARS.map((pillar) => (
             <div key={pillar.id} className="stagger-item flex min-w-0">
-              <motion.div
-                whileHover={{ y: -4 }}
-                transition={{ duration: 0.25 }}
-                className="flex w-full min-w-0 flex-col justify-between rounded-2xl border border-black/12 bg-white/85 p-4 shadow-[0_12px_32px_-16px_rgba(13,14,18,0.1)] transition-shadow hover:shadow-[0_20px_42px_-16px_rgba(0,56,255,0.14)] min-[380px]:p-5 sm:p-6 lg:p-7"
-              >
+              <div className="flex w-full min-w-0 flex-col justify-between rounded-2xl border border-black/12 bg-white/85 p-4 shadow-[0_12px_32px_-16px_rgba(13,14,18,0.1)] transition-[transform,box-shadow] duration-250 ease-out hover:-translate-y-1 hover:shadow-[0_20px_42px_-16px_rgba(0,56,255,0.14)] min-[380px]:p-5 sm:p-6 lg:p-7">
               <div className="min-w-0">
                 <div className="flex items-center justify-between gap-2 font-mono text-[10px] tracking-[0.16em] sm:text-[11px] sm:tracking-[0.18em]">
                   <span className="font-bold text-[#0038FF]">
@@ -137,7 +130,7 @@ export function SkillSection() {
                   ))}
                   </ul>
                 </div>
-              </motion.div>
+              </div>
             </div>
           ))}
         </div>

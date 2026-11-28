@@ -873,6 +873,8 @@ export function AdminStudioClient({
                         <img
                           src={projectForm.imageUrl}
                           alt="Cover preview"
+                          loading="lazy"
+                          decoding="async"
                           className="h-16 w-28 rounded-lg border border-black/15 object-cover"
                         />
                         <div className="min-w-0 flex-1">
@@ -1072,6 +1074,8 @@ export function AdminStudioClient({
                             <img
                               src={ph.imageUrl}
                               alt={ph.title}
+                              loading="lazy"
+                              decoding="async"
                               className="h-10 w-10 shrink-0 rounded-lg border border-black/10 object-cover"
                             />
                           ) : (
@@ -1145,6 +1149,8 @@ export function AdminStudioClient({
                         <img
                           src={photoForm.imageUrl}
                           alt="Photo preview"
+                          loading="lazy"
+                          decoding="async"
                           className="h-20 w-28 rounded-lg border border-black/15 object-cover"
                         />
                         <div className="min-w-0 flex-1">

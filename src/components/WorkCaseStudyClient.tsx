@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ArrowUpRight, Pause, Play } from "lucide-react";
 import type { ProjectItem } from "@/data/portfolio";
 import { useNearViewport, usePerformanceProfile } from "@/lib/devicePerf";
-import { generatePresetPointCloud } from "@/lib/pointCloudGenerator";
+import type { PointCloudData } from "@/lib/pointCloudGenerator";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
+import { OptimizedImage } from "./OptimizedImage";
 import { TouchInteractPill, useTouchInteractGate } from "./TouchInteractGate";
 
 interface WorkCaseStudyClientProps {
@@ -29,10 +30,21 @@ export function WorkCaseStudyClient({
   const perf = usePerformanceProfile();
   const isNearStage = useNearViewport(stageRef, "300px 0px");
   const touchGate = useTouchInteractGate(stageRef);
+  const [cloud, setCloud] = useState<PointCloudData | null>(null);
 
-  const cloud = useMemo(() => {
-    if (!isNearStage || !perf) return null;
-    return generatePresetPointCloud(project.preset, perf.worksPoints);
+  useEffect(() => {
+    if (!isNearStage || !perf) return;
+    let cancelled = false;
+    import("@/lib/pointCloudGenerator")
+      .then(({ generatePresetPointCloud }) => {
+        if (!cancelled) {
+          setCloud(generatePresetPointCloud(project.preset, perf.worksPoints));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [isNearStage, perf, project.preset]);
 
   return (
@@ -217,14 +229,13 @@ export function WorkCaseStudyClient({
         {/* Optional Uploaded Vercel Blob Cover Image */}
         {project.imageUrl && (
           <div className="reveal-up mb-10 overflow-hidden rounded-2xl border border-black/12 bg-white/85 shadow-[0_18px_40px_-18px_rgba(13,14,18,0.14)] sm:mb-12">
-            <div className="aspect-[16/9] w-full overflow-hidden bg-[#ECEEF0]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+            <div className="relative aspect-[16/9] w-full overflow-hidden bg-[#ECEEF0]">
+              <OptimizedImage
                 src={project.imageUrl}
                 alt={`${project.title} visual documentation`}
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover"
+                sizes="(max-width: 1200px) 100vw, 1180px"
+                quality={85}
+                className="object-cover"
               />
             </div>
           </div>

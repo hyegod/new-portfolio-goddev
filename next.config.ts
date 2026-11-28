@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["10.225.194.225"],
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [75, 85],
+    minimumCacheTTL: 2678400,
+    localPatterns: [
+      {
+        pathname: "/api/blob",
+      },
+    ],
     remotePatterns: [
       {
         protocol: "https",
@@ -35,6 +42,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["motion/react", "motion", "lucide-react", "three"],
+    turbopackLazyDynamicImports: true,
   },
 };
 

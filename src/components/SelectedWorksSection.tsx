@@ -1,19 +1,18 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Pause, Play } from "lucide-react";
 import { motion } from "motion/react";
 import { PROJECTS, type ProjectItem } from "@/data/portfolio";
 import { useNearViewport, usePerformanceProfile } from "@/lib/devicePerf";
-import {
-  generatePresetPointCloud,
-  type PointCloudData,
-} from "@/lib/pointCloudGenerator";
+import type { PointCloudData } from "@/lib/pointCloudGenerator";
 import { LazyGatherPointCloud } from "./LazyGatherPointCloud";
-import { GitHubWorksPanel } from "./GitHubWorksPanel";
+import {
+  LazyGitHubWorksPanel,
+  LazyWorksLabSection,
+} from "./LazyHeavyModules";
 import { TouchInteractPill, useTouchInteractGate } from "./TouchInteractGate";
-import { WorksLabSection } from "./WorksLabSection";
 
 export function SelectedWorksSection({
   projects = PROJECTS,
@@ -34,18 +33,34 @@ export function SelectedWorksSection({
   const activeProject =
     list.find((p) => p.id === activeId) ?? list[0];
 
-  // Generate ONLY the active preset on demand once #works nears the viewport, cached per session
-  const activeCloud = useMemo(() => {
-    if (!isNearPreview || !perf) return null;
+  const [activeCloud, setActiveCloud] = useState<PointCloudData | null>(null);
+
+  // Dynamically load point-cloud generator & build ONLY the active preset once #works nears viewport
+  useEffect(() => {
+    if (!isNearPreview || !perf) return;
     const key = `${activeProject.preset}-${perf.worksPoints}`;
     const cached = cloudCacheRef.current.get(key);
-    if (cached) return cached;
-    const generated = generatePresetPointCloud(
-      activeProject.preset,
-      perf.worksPoints
-    );
-    cloudCacheRef.current.set(key, generated);
-    return generated;
+    if (cached) {
+      setActiveCloud(cached);
+      return;
+    }
+
+    let cancelled = false;
+    import("@/lib/pointCloudGenerator")
+      .then(({ generatePresetPointCloud }) => {
+        if (cancelled) return;
+        const generated = generatePresetPointCloud(
+          activeProject.preset,
+          perf.worksPoints
+        );
+        cloudCacheRef.current.set(key, generated);
+        setActiveCloud(generated);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeProject.preset, isNearPreview, perf]);
 
   return (
@@ -341,11 +356,11 @@ export function SelectedWorksSection({
           </div>
         </div>
 
-        {/* Live GitHub Contribution Heatmap & Auto-Synced Public Repositories */}
-        <GitHubWorksPanel />
+        {/* Live GitHub Contribution Heatmap & Auto-Synced Public Repositories (lazy-loaded near viewport) */}
+        <LazyGitHubWorksPanel />
 
-        {/* Interactive 3D LiDAR & WebGPU (vgpu) Engineering Lab */}
-        <WorksLabSection showPlates={false} />
+        {/* Interactive 3D LiDAR & WebGPU (vgpu) Engineering Lab (lazy-loaded near viewport) */}
+        <LazyWorksLabSection showPlates={false} />
       </div>
     </section>
   );

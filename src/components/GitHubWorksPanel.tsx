@@ -533,12 +533,12 @@ export function GitHubWorksPanel() {
               return (
                 <motion.div
                   key={repo.id}
-                  initial={{ opacity: 0, y: 20, filter: "blur(5px)" }}
-                  whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  initial={{ opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.15 }}
                   transition={{
-                    duration: 0.8,
-                    delay: Math.min(idx * 0.12, 0.48),
+                    duration: 0.55,
+                    delay: Math.min(idx * 0.08, 0.32),
                     ease: [0.22, 1, 0.36, 1],
                   }}
                   whileHover={{ y: -4 }}

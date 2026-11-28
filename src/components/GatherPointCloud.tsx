@@ -1156,7 +1156,9 @@ export function GatherPointCloud({
       else startLoop();
     };
 
-    const cvTarget = container.closest(".deferred-lab, .deferred-section") ?? container;
+    const cvTarget =
+      container.closest(".deferred-lab, .deferred-works, .deferred-section") ??
+      container;
     cvTarget.addEventListener("contentvisibilityautostatechange", onCvChange);
 
     // IntersectionObserver fallback + additional off-screen safeguard
