@@ -9,6 +9,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { EngineeringCursor } from "./EngineeringCursor";
+import { InitialPreloader } from "./InitialPreloader";
 
 type TransitionPhase = "idle" | "exiting" | "entering";
 
@@ -247,6 +248,9 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
 
   return (
     <>
+      {/* Minimalist Architectural Initial Loading Curtain */}
+      <InitialPreloader />
+
       {/* Persistent Precision CAD Custom Cursor */}
       <EngineeringCursor />
 
