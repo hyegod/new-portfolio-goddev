@@ -853,7 +853,7 @@ dialog.editorial-dialog::backdrop {
 
 .preloader-curtain {
   transform: translate3d(0, 0, 0);
-  transition: transform 640ms cubic-bezier(0.76, 0, 0.24, 1);
+  transition: transform 420ms cubic-bezier(0.76, 0, 0.24, 1);
   will-change: transform;
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LazyVgpuCanvas } from "@/components/LazyVgpuCanvas";
+import { hasHardwareWebGPU } from "@/lib/devicePerf";
 import { createRenderer } from "./renderer";
 
 export interface BlackHoleShowcaseProps {
@@ -20,23 +21,25 @@ export function OptimizedBlackHoleShowcase({
   );
 
   useEffect(() => {
-    if (
-      typeof navigator === "undefined" ||
-      !("gpu" in navigator) ||
-      !navigator.gpu
-    ) {
-      setStatus("fallback");
-      return;
-    }
-
     let cancelled = false;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    let renderer: ReturnType<typeof createRenderer> | undefined;
 
-    const renderer = createRenderer({ canvas });
-    renderer.ready
-      .then(() => {
-        if (!cancelled) setStatus("webgpu");
+    hasHardwareWebGPU()
+      .then((supported) => {
+        if (cancelled) return;
+        const canvas = canvasRef.current;
+        if (!supported || !canvas) {
+          setStatus("fallback");
+          return;
+        }
+        renderer = createRenderer({ canvas });
+        return renderer.ready
+          .then(() => {
+            if (!cancelled) setStatus("webgpu");
+          })
+          .catch(() => {
+            if (!cancelled) setStatus("fallback");
+          });
       })
       .catch(() => {
         if (!cancelled) setStatus("fallback");
@@ -44,7 +47,7 @@ export function OptimizedBlackHoleShowcase({
 
     return () => {
       cancelled = true;
-      renderer.dispose();
+      renderer?.dispose();
     };
   }, []);
 
@@ -54,7 +57,7 @@ export function OptimizedBlackHoleShowcase({
         shaderId="black-hole"
         ambient={ambient}
         forceWebgl
-        maxDpr={1.5}
+        maxDpr={0.9}
         className={className}
         ariaLabel="Relativistic black hole gravitational lensing background"
       />

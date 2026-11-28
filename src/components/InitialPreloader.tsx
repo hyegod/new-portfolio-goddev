@@ -6,20 +6,26 @@ import { PORTFOLIO_PROFILE } from "@/data/portfolio";
 
 type PreloaderPhase = "loading" | "ready" | "exiting" | "done";
 
-/** Deliberate, unhurried ramp duration (~1.9s) + brief 100% hold (~280ms) + smooth curtain lift (~640ms). */
-const MIN_LOAD_MS = 1900;
-const READY_HOLD_MS = 280;
-const EXIT_CURTAIN_MS = 640;
+/** Balanced, poised ramp (~1.05s) + brief 100% hold (~150ms) + smooth GPU curtain lift (~420ms). */
+const MIN_LOAD_MS = 1050;
+const READY_HOLD_MS = 150;
+const EXIT_CURTAIN_MS = 420;
 
 /** Architectural ease curve: smooth start, poised mid-glide, soft settle into 100%. */
 function easeProgress(t: number): number {
   if (t <= 0) return 0;
   if (t >= 1) return 1;
-  // Blend cubic ease-in-out with a subtle organic mid-curve pause around ~78%
   const base =
     t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  const microHold = Math.sin(t * Math.PI * 2) * 0.025 * (1 - t);
+  const microHold = Math.sin(t * Math.PI * 2) * 0.02 * (1 - t);
   return Math.max(0, Math.min(1, base + microHold));
+}
+
+function getStatusLabel(pct: number): string {
+  if (pct >= 100) return "READY";
+  if (pct >= 72) return "CALIBRATING 3D · GPU";
+  if (pct >= 34) return "LOADING ARCHITECTURE";
+  return "INITIALIZING SURFACE";
 }
 
 export function InitialPreloader() {
@@ -29,9 +35,10 @@ export function InitialPreloader() {
   const [phase, setPhase] = useState<PreloaderPhase>(
     isAdmin ? "done" : "loading"
   );
-  const [percent, setPercent] = useState<number>(0);
 
   const barRef = useRef<HTMLDivElement>(null);
+  const pctRef = useRef<HTMLSpanElement>(null);
+  const statusRef = useRef<HTMLSpanElement>(null);
   const finishedRef = useRef(false);
   const skipTimerRef = useRef<number>(0);
 
@@ -47,13 +54,9 @@ export function InitialPreloader() {
 
     if (prefersReduced) {
       finishedRef.current = true;
-      setPercent(100);
       setPhase("done");
       return;
     }
-
-    const prevOverflow = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = "hidden";
 
     let rafId = 0;
     let holdTimer = 0;
@@ -74,19 +77,35 @@ export function InitialPreloader() {
 
     const startTime = performance.now();
     let lastDisplayed = -1;
+    let lastLabel = "";
+
+    const paintProgress = (ratio: number, pct: number) => {
+      if (barRef.current) {
+        barRef.current.style.transform = `scaleX(${ratio.toFixed(4)})`;
+      }
+      if (pct !== lastDisplayed) {
+        lastDisplayed = pct;
+        if (pctRef.current) {
+          pctRef.current.textContent = `${String(pct).padStart(3, "0")}%`;
+        }
+        const label = getStatusLabel(pct);
+        if (label !== lastLabel) {
+          lastLabel = label;
+          if (statusRef.current) {
+            statusRef.current.textContent = label;
+          }
+        }
+      }
+    };
 
     const complete = () => {
       if (disposed || finishedRef.current) return;
       finishedRef.current = true;
-      setPercent(100);
-      if (barRef.current) {
-        barRef.current.style.transform = "scaleX(1)";
-      }
+      paintProgress(1, 100);
       setPhase("ready");
 
       holdTimer = window.setTimeout(() => {
         if (disposed) return;
-        document.documentElement.style.overflow = prevOverflow;
         setPhase("exiting");
 
         exitTimer = window.setTimeout(() => {
@@ -102,22 +121,14 @@ export function InitialPreloader() {
       const rawT = Math.min(1, elapsed / MIN_LOAD_MS);
       let eased = easeProgress(rawT);
 
-      // Wait briefly at 94% only if fonts/document are still finishing load (capped at +900ms)
-      if (!assetsReady && elapsed < MIN_LOAD_MS + 900) {
+      if (!assetsReady && elapsed < MIN_LOAD_MS + 600) {
         eased = Math.min(eased, 0.94);
       }
 
-      if (barRef.current) {
-        barRef.current.style.transform = `scaleX(${eased.toFixed(4)})`;
-      }
-
       const nextPct = Math.min(100, Math.round(eased * 100));
-      if (nextPct !== lastDisplayed) {
-        lastDisplayed = nextPct;
-        setPercent(nextPct);
-      }
+      paintProgress(eased, nextPct);
 
-      if (rawT >= 1 && (assetsReady || elapsed >= MIN_LOAD_MS + 900)) {
+      if (rawT >= 1 && (assetsReady || elapsed >= MIN_LOAD_MS + 600)) {
         complete();
         return;
       }
@@ -134,18 +145,15 @@ export function InitialPreloader() {
       window.clearTimeout(exitTimer);
       window.clearTimeout(skipTimerRef.current);
       window.removeEventListener("load", markAssetsReady);
-      document.documentElement.style.overflow = prevOverflow;
     };
   }, [isAdmin]);
 
   const handleSkip = () => {
     if (finishedRef.current) return;
     finishedRef.current = true;
-    document.documentElement.style.overflow = "";
-    setPercent(100);
-    if (barRef.current) {
-      barRef.current.style.transform = "scaleX(1)";
-    }
+    if (barRef.current) barRef.current.style.transform = "scaleX(1)";
+    if (pctRef.current) pctRef.current.textContent = "100%";
+    if (statusRef.current) statusRef.current.textContent = "READY";
     setPhase("exiting");
     skipTimerRef.current = window.setTimeout(() => {
       setPhase("done");
@@ -155,22 +163,15 @@ export function InitialPreloader() {
   if (isAdmin || phase === "done") return null;
 
   const isExiting = phase === "exiting";
-  const statusLabel =
-    percent >= 100
-      ? "READY"
-      : percent >= 72
-        ? "CALIBRATING 3D · GPU"
-        : percent >= 34
-          ? "LOADING ARCHITECTURE"
-          : "INITIALIZING SURFACE";
+  const isReady = phase === "ready" || isExiting;
 
   return (
     <div
       role="status"
       aria-live="polite"
-      aria-label={`Loading ${PORTFOLIO_PROFILE.brand} portfolio: ${percent}%`}
+      aria-label={`Loading ${PORTFOLIO_PROFILE.brand} portfolio`}
       data-phase={phase}
-      className={`preloader-curtain fixed inset-0 z-[9990] flex flex-col justify-between bg-[#ECEEF0] px-4 py-5 text-[#0D0E12] select-none sm:px-8 sm:py-7 lg:px-12 ${
+      className={`preloader-curtain fixed inset-0 z-[9990] flex touch-none overscroll-none flex-col justify-between bg-[#ECEEF0] px-4 py-5 text-[#0D0E12] select-none sm:px-8 sm:py-7 lg:px-12 ${
         isExiting ? "preloader-curtain-exit pointer-events-none" : ""
       }`}
     >
@@ -233,19 +234,19 @@ export function InitialPreloader() {
           />
         </div>
 
-        {/* Clean Tabular Counter & Phase Telemetry */}
+        {/* Clean Tabular Counter & Phase Telemetry (DOM-driven: 0 React re-renders during ramp) */}
         <div className="mt-3.5 flex w-full items-center justify-between font-mono text-[10px] tracking-[0.18em] uppercase">
           <span
-            className={
-              percent >= 100
-                ? "font-semibold text-[#0038FF]"
-                : "text-[#505562]"
-            }
+            ref={statusRef}
+            className={isReady ? "font-semibold text-[#0038FF]" : "text-[#505562]"}
           >
-            {statusLabel}
+            INITIALIZING SURFACE
           </span>
-          <span className="font-semibold text-[#0D0E12] tabular-nums">
-            {String(percent).padStart(3, "0")}%
+          <span
+            ref={pctRef}
+            className="font-semibold text-[#0D0E12] tabular-nums"
+          >
+            000%
           </span>
         </div>
       </div>

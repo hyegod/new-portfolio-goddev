@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LazyVgpuCanvas } from "@/components/LazyVgpuCanvas";
+import { hasHardwareWebGPU } from "@/lib/devicePerf";
 import { createRenderer } from "./renderer";
 
 export interface InteractiveFluidShowcaseProps {
@@ -20,23 +21,25 @@ export function InteractiveFluidShowcase({
   );
 
   useEffect(() => {
-    if (
-      typeof navigator === "undefined" ||
-      !("gpu" in navigator) ||
-      !navigator.gpu
-    ) {
-      setStatus("fallback");
-      return;
-    }
-
     let cancelled = false;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    let renderer: ReturnType<typeof createRenderer> | undefined;
 
-    const renderer = createRenderer({ canvas, ambient });
-    renderer.ready
-      .then(() => {
-        if (!cancelled) setStatus("webgpu");
+    hasHardwareWebGPU()
+      .then((supported) => {
+        if (cancelled) return;
+        const canvas = canvasRef.current;
+        if (!supported || !canvas) {
+          setStatus("fallback");
+          return;
+        }
+        renderer = createRenderer({ canvas, ambient });
+        return renderer.ready
+          .then(() => {
+            if (!cancelled) setStatus("webgpu");
+          })
+          .catch(() => {
+            if (!cancelled) setStatus("fallback");
+          });
       })
       .catch(() => {
         if (!cancelled) setStatus("fallback");
@@ -44,7 +47,7 @@ export function InteractiveFluidShowcase({
 
     return () => {
       cancelled = true;
-      renderer.dispose();
+      renderer?.dispose();
     };
   }, [ambient]);
 
@@ -55,7 +58,7 @@ export function InteractiveFluidShowcase({
         ambient={ambient}
         forceWebgl
         paperLight
-        maxDpr={1.4}
+        maxDpr={ambient ? 0.85 : 1.15}
         className={className}
         ariaLabel="Interactive Navier-Stokes concrete and cobalt fluid simulation (WebGL2 compatibility mode)"
       />

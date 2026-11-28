@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { LazyVgpuCanvas } from "@/components/LazyVgpuCanvas";
+import { hasHardwareWebGPU } from "@/lib/devicePerf";
 import { SHAPES } from "./choreography";
 import { createRenderer } from "./renderer";
 
@@ -25,32 +26,33 @@ export function SpringChoreographyShowcase({
   const [activeShape, setActiveShape] = useState<number>(0);
 
   useEffect(() => {
-    if (
-      typeof navigator === "undefined" ||
-      !("gpu" in navigator) ||
-      !navigator.gpu
-    ) {
-      setStatus("fallback");
-      return;
-    }
-
     let cancelled = false;
-    const canvas = canvasRef.current;
-    const container = rootRef.current;
-    if (!canvas || !container) return;
+    let renderer: ReturnType<typeof createRenderer> | undefined;
 
-    const renderer = createRenderer({
-      canvas,
-      container,
-      onShapeChange: (idx) => {
-        if (!cancelled) setActiveShape(idx);
-      },
-    });
-    rendererRef.current = renderer;
-
-    renderer.ready
-      .then(() => {
-        if (!cancelled) setStatus("webgpu");
+    hasHardwareWebGPU()
+      .then((supported) => {
+        if (cancelled) return;
+        const canvas = canvasRef.current;
+        const container = rootRef.current;
+        if (!supported || !canvas || !container) {
+          setStatus("fallback");
+          return;
+        }
+        renderer = createRenderer({
+          canvas,
+          container,
+          onShapeChange: (idx) => {
+            if (!cancelled) setActiveShape(idx);
+          },
+        });
+        rendererRef.current = renderer;
+        return renderer.ready
+          .then(() => {
+            if (!cancelled) setStatus("webgpu");
+          })
+          .catch(() => {
+            if (!cancelled) setStatus("fallback");
+          });
       })
       .catch(() => {
         if (!cancelled) setStatus("fallback");
@@ -59,7 +61,7 @@ export function SpringChoreographyShowcase({
     return () => {
       cancelled = true;
       rendererRef.current = null;
-      renderer.dispose();
+      renderer?.dispose();
     };
   }, []);
 
@@ -69,7 +71,7 @@ export function SpringChoreographyShowcase({
         shaderId="fluid"
         ambient
         forceWebgl
-        maxDpr={1.4}
+        maxDpr={0.9}
         className={className}
         ariaLabel="Interactive fluid particle field behind slogan"
       />

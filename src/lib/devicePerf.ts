@@ -233,3 +233,122 @@ export function scheduleBackgroundTask(
     window.clearTimeout(timer);
   };
 }
+
+const SOFTWARE_RENDERER_RE =
+  /swiftshader|llvmpipe|softpipe|mesa offscreen|microsoft basic render|subzero|virtualbox|vmware/i;
+
+let cachedHardwareWebgl: boolean | null = null;
+
+/**
+ * Checks whether the browser has genuine hardware-accelerated WebGL rather than
+ * a CPU software rasterizer (e.g. SwiftShader / llvmpipe / basic render driver).
+ * Prevents full-screen ambient shaders from saturating the main thread on software GPUs.
+ */
+export function hasHardwareWebGL(): boolean {
+  if (cachedHardwareWebgl !== null) return cachedHardwareWebgl;
+  if (typeof document === "undefined") return false;
+
+  try {
+    const probe = document.createElement("canvas");
+    probe.width = 2;
+    probe.height = 2;
+    const attrs: WebGLContextAttributes = {
+      failIfMajorPerformanceCaveat: true,
+      alpha: false,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      powerPreference: "low-power",
+    };
+    const gl =
+      (probe.getContext("webgl2", attrs) as WebGLRenderingContext | null) ??
+      (probe.getContext("webgl", attrs) as WebGLRenderingContext | null);
+
+    if (!gl) {
+      cachedHardwareWebgl = false;
+      return false;
+    }
+
+    let rendererName = "";
+    try {
+      const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+      if (dbg) {
+        rendererName = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) ?? "");
+      } else {
+        rendererName = String(gl.getParameter(gl.RENDERER) ?? "");
+      }
+    } catch {
+      rendererName = "";
+    }
+
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    cachedHardwareWebgl = !SOFTWARE_RENDERER_RE.test(rendererName);
+    return cachedHardwareWebgl;
+  } catch {
+    cachedHardwareWebgl = false;
+    return false;
+  }
+}
+
+let cachedHardwareWebgpuPromise: Promise<boolean> | null = null;
+
+/**
+ * Verifies that WebGPU resolves a genuine hardware adapter (not a CPU fallback adapter).
+ */
+export function hasHardwareWebGPU(): Promise<boolean> {
+  if (cachedHardwareWebgpuPromise) return cachedHardwareWebgpuPromise;
+
+  cachedHardwareWebgpuPromise = (async () => {
+    if (
+      typeof navigator === "undefined" ||
+      !("gpu" in navigator) ||
+      !navigator.gpu
+    ) {
+      return false;
+    }
+    try {
+      const gpuNav = navigator.gpu as {
+        requestAdapter: (opts?: {
+          powerPreference?: "low-power" | "high-performance";
+          forceFallbackAdapter?: boolean;
+        }) => Promise<
+          | ({
+              isFallbackAdapter?: boolean;
+              info?: {
+                isFallbackAdapter?: boolean;
+                vendor?: string;
+                architecture?: string;
+                description?: string;
+                device?: string;
+              };
+            } & object)
+          | null
+        >;
+      };
+      const adapter = await gpuNav.requestAdapter({
+        powerPreference: "low-power",
+        forceFallbackAdapter: false,
+      });
+      if (!adapter) return false;
+      if (adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter) {
+        return false;
+      }
+      const desc = [
+        adapter.info?.vendor,
+        adapter.info?.architecture,
+        adapter.info?.description,
+        adapter.info?.device,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      if (desc && SOFTWARE_RENDERER_RE.test(desc)) {
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  return cachedHardwareWebgpuPromise;
+}

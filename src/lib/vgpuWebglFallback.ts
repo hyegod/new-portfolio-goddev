@@ -1,4 +1,5 @@
 import type { VgpuShaderId } from "@/components/VgpuCanvas";
+import { hasHardwareWebGL } from "@/lib/devicePerf";
 
 export interface VgpuPointerState {
   x: number;
@@ -918,10 +919,17 @@ export function startWebglShaderFallback(
 
   if (!gl) return null;
 
+  const isHardwareGpu = hasHardwareWebGL();
   const isCoarsePointer =
     typeof window !== "undefined" &&
     window.matchMedia("(pointer: coarse)").matches;
-  const effectiveMaxDpr = isCoarsePointer ? Math.min(maxDpr, 1.35) : Math.min(maxDpr, 1.75);
+  const effectiveMaxDpr = !isHardwareGpu
+    ? 0.5
+    : ambient
+      ? Math.min(maxDpr, 0.85)
+      : isCoarsePointer
+        ? Math.min(maxDpr, 1.15)
+        : Math.min(maxDpr, 1.35);
 
   // Fullscreen triangle covering clip space (-1..1)
   const quadBuf = gl.createBuffer();
@@ -949,7 +957,13 @@ export function startWebglShaderFallback(
   let mainProg: WebGLProgram | null = null;
 
   // Fluid ping-pong state (RGBA8 works on 100% of phones/tablets without float FBO extensions)
-  const simSize = isCoarsePointer ? 320 : 448;
+  const simSize = !isHardwareGpu
+    ? 96
+    : ambient
+      ? 160
+      : isCoarsePointer
+        ? 256
+        : 320;
   const ppTex: WebGLTexture[] = [];
   const ppFbo: WebGLFramebuffer[] = [];
   let readIdx = 0;
@@ -1114,29 +1128,36 @@ export function startWebglShaderFallback(
   let disposed = false;
   let lastTs = performance.now();
   let elapsed = 0;
-  const targetInterval = ambient ? 1000 / 40 : 1000 / 60;
+  const targetInterval = ambient ? 1000 / 28 : 1000 / 50;
   let lastRenderTs = 0;
+  let renderedFrames = 0;
+  let slowFrameStreak = 0;
 
   const renderFrame = (now: number) => {
+    rafId = 0;
     if (disposed) return;
-    rafId = requestAnimationFrame(renderFrame);
 
     if (!isVisible() || document.hidden || isPaused()) {
       lastTs = now;
+      rafId = requestAnimationFrame(renderFrame);
       return;
     }
 
-    if (now - lastRenderTs < targetInterval * 0.85) return;
+    if (renderedFrames > 0 && now - lastRenderTs < targetInterval * 0.85) {
+      rafId = requestAnimationFrame(renderFrame);
+      return;
+    }
     lastRenderTs = now;
 
+    const frameStart = performance.now();
     const rawDt = (now - lastTs) / 1000;
     lastTs = now;
     const dt = reducedMotion
       ? 0.004
       : Math.min(0.033, Math.max(0.004, rawDt || 0.016));
-    elapsed += dt;
+    elapsed += renderedFrames === 0 && !isHardwareGpu ? 1.6 : dt;
 
-    syncSize();
+    // Dimensions are kept synced by ResizeObserver (avoid per-frame getBoundingClientRect reflow)
     const aspect = width / Math.max(1, height);
 
     if (shaderId === "fluid" && simProg && dispProg && simLocs && dispLocs) {
@@ -1194,10 +1215,7 @@ export function startWebglShaderFallback(
         gl.uniform1f(dispLocs.paperLight, paperLight ? 1.0 : 0.0);
       }
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-      return;
-    }
-
-    if (mainProg && mainLocs) {
+    } else if (mainProg && mainLocs) {
       ptr.orbitX += (ptr.targetOrbitX - ptr.orbitX) * 0.1;
       ptr.orbitY += (ptr.targetOrbitY - ptr.orbitY) * 0.1;
 
@@ -1249,6 +1267,25 @@ export function startWebglShaderFallback(
       }
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
+
+    renderedFrames++;
+    const drawDurationMs = performance.now() - frameStart;
+    if (drawDurationMs > 44) {
+      slowFrameStreak++;
+    } else {
+      slowFrameStreak = 0;
+    }
+
+    // On software rasterizers (e.g. SwiftShader) or severely overloaded ambient GPUs,
+    // keep the crisp rendered frame visible and stop looping so the main thread stays unblocked.
+    if (!isHardwareGpu && renderedFrames >= (shaderId === "fluid" ? 2 : 1)) {
+      return;
+    }
+    if (ambient && slowFrameStreak >= 4) {
+      return;
+    }
+
+    rafId = requestAnimationFrame(renderFrame);
   };
 
   rafId = requestAnimationFrame(renderFrame);

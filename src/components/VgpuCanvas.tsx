@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { hasHardwareWebGPU } from "@/lib/devicePerf";
 import {
   clock,
   effect,
@@ -346,10 +347,23 @@ export function VgpuCanvas({
       "gpu" in navigator &&
       Boolean(navigator.gpu);
 
-    if (!hasWebgpuApi) {
-      notify("loading");
-      void launchWebglFallback();
-    } else {
+    const startGpuOrFallback = async () => {
+      if (!hasWebgpuApi) {
+        notify("loading");
+        await launchWebglFallback();
+        return;
+      }
+      const hwGpu = await hasHardwareWebGPU();
+      if (cancelled) return;
+      if (!hwGpu) {
+        notify("loading");
+        await launchWebglFallback();
+        return;
+      }
+      await bootWebgpuEngine();
+    };
+
+    const bootWebgpuEngine = async () => {
       // Offscreen procedural video feed canvas for "video-texture" mode
       const videoW = 512;
       const videoH = 320;
@@ -612,7 +626,7 @@ export function VgpuCanvas({
                 });
                 f.pass(canvasSurface, fx);
               },
-              { fps: ambient ? 45 : 60 }
+              { fps: ambient ? 30 : 50 }
             );
           }
 
@@ -629,7 +643,9 @@ export function VgpuCanvas({
           }
         }
       })();
-    }
+    };
+
+    void startGpuOrFallback();
 
     return () => {
       cancelled = true;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Bot } from "lucide-react";
-import { scheduleBackgroundTask } from "@/lib/devicePerf";
+import { hasHardwareWebGPU, scheduleBackgroundTask } from "@/lib/devicePerf";
 import {
   createRoamingRenderer,
   ROAMING_BOTS,
@@ -38,35 +38,49 @@ export function RoamingBotsOverlay() {
   const [ready, setReady] = useState(false);
   const [pings, setPings] = useState<ActivePing[]>([]);
 
-  // Detect WebGPU + desktop/tablet capability & persisted preference, deferred behind Hero LCP
+  // Detect genuine hardware WebGPU + desktop/tablet capability & persisted preference, deferred behind LCP
   useEffect(() => {
     if (typeof window === "undefined" || typeof navigator === "undefined") return;
-    const hasGpu = "gpu" in navigator && Boolean(navigator.gpu);
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const narrowTouch =
       window.matchMedia("(hover: none) and (pointer: coarse)").matches &&
       window.innerWidth < 768;
 
-    if (!hasGpu || reduced || narrowTouch) {
+    if (reduced || narrowTouch) {
       setSupported(false);
       return;
     }
 
-    try {
-      const saved = window.sessionStorage.getItem(STORAGE_KEY);
-      if (saved === "off") setEnabled(false);
-    } catch {
-      // Ignore storage errors
-    }
-
-    setSupported(true);
+    let cancelled = false;
     let cancelBoot: (() => void) | undefined;
-    const timer = window.setTimeout(() => {
-      cancelBoot = scheduleBackgroundTask(() => {
-        setBooted(true);
-      }, 300);
-    }, 1450);
+    let timer = 0;
+
+    hasHardwareWebGPU()
+      .then((hasHwGpu) => {
+        if (cancelled) return;
+        if (!hasHwGpu) {
+          setSupported(false);
+          return;
+        }
+        try {
+          const saved = window.sessionStorage.getItem(STORAGE_KEY);
+          if (saved === "off") setEnabled(false);
+        } catch {
+          // Ignore storage errors
+        }
+        setSupported(true);
+        timer = window.setTimeout(() => {
+          cancelBoot = scheduleBackgroundTask(() => {
+            if (!cancelled) setBooted(true);
+          }, 300);
+        }, 1250);
+      })
+      .catch(() => {
+        if (!cancelled) setSupported(false);
+      });
+
     return () => {
+      cancelled = true;
       window.clearTimeout(timer);
       cancelBoot?.();
     };

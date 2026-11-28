@@ -15,6 +15,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
+import { hasHardwareWebGL } from "@/lib/devicePerf";
 import type { PointCloudData } from "@/lib/pointCloudGenerator";
 
 export type TravelMode = "swarm" | "melt";
@@ -321,13 +322,16 @@ export function GatherPointCloud({
     };
     motionMq.addEventListener("change", onMotionChange);
 
+    const isHardwareGpu = hasHardwareWebGL();
     let renderer: WebGLRenderer;
     try {
       renderer = new WebGLRenderer({
         canvas: glCanvas,
         alpha: true,
         antialias: false,
-        powerPreference: "high-performance",
+        powerPreference: configRef.current.interactive
+          ? "high-performance"
+          : "low-power",
       });
     } catch {
       setWebglFailed(true);
@@ -770,6 +774,9 @@ export function GatherPointCloud({
     // with IntersectionObserver + Page Visibility fallback
     let rafId = 0;
     let lastTimestamp = performance.now();
+    let lastRenderTimestamp = 0;
+    let frameIndex = 0;
+    let slowStreak = 0;
     const tempVec = new Vector3();
     const scratchAnchorVec = new Vector3();
     const scratchAxisA = new Vector3();
@@ -1036,10 +1043,23 @@ export function GatherPointCloud({
       rafId = 0;
       if (!engineRef.current.isVisible || document.hidden) return;
 
+      const cfg = configRef.current;
+      const isAmbientOnly = !cfg.interactive;
+      const minIntervalMs = isAmbientOnly ? 32 : 0; // ~30fps for ambient Hero backdrop
+      if (
+        frameIndex > 0 &&
+        minIntervalMs > 0 &&
+        now - lastRenderTimestamp < minIntervalMs
+      ) {
+        rafId = requestAnimationFrame(renderFrame);
+        return;
+      }
+      lastRenderTimestamp = now;
+
+      const frameStart = performance.now();
       const dt = Math.min(0.05, (now - lastTimestamp) / 1000);
       lastTimestamp = now;
 
-      const cfg = configRef.current;
       const isPaused = cfg.paused;
 
       if (!isPaused) {
@@ -1128,7 +1148,25 @@ export function GatherPointCloud({
       uniforms.uPointer.value.copy(pointerSmooth);
 
       renderer.render(scene, camera);
-      drawHudOverlay(uniforms.uTime.value);
+      if (!isAmbientOnly || frameIndex % 2 === 0) {
+        drawHudOverlay(uniforms.uTime.value);
+      }
+
+      frameIndex++;
+      const drawMs = performance.now() - frameStart;
+      if (drawMs > 44) {
+        slowStreak++;
+      } else {
+        slowStreak = 0;
+      }
+
+      // On software WebGL (SwiftShader) or overloaded ambient GPUs, preserve the rendered 3D frame and stop looping
+      if (!isHardwareGpu && frameIndex >= 1) {
+        return;
+      }
+      if (isAmbientOnly && slowStreak >= 4) {
+        return;
+      }
 
       rafId = requestAnimationFrame(renderFrame);
     };
